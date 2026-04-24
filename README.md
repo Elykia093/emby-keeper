@@ -1,3 +1,15 @@
+## 本分支更新记录
+
+- 跳过 CHECKINER / MONITOR 总认证与站点 `additional_auth` 检查，避免 Auth Bot 失效导致签到或监控流程中断。
+- 将原远端 GPT / visual 能力替换为本地智谱 AI / VLM，配置项为 `[checkiner.ai]`。
+- 新增 `zai-sdk==0.2.2` 依赖、AI 图片验证码签到模板 `_templ_ai.py` 与月饼 AI 签到站点 `mooncake_ai`。
+- Web 容器启动不再默认触发即时签到和保活，打开控制台也不触发即时任务。
+- 优化 Emby 保活拉流请求头、分段读取、限速、暂停和进度上报节奏。
+- 签到汇总日志会列出除成功外的站点明细，包括已签到、失败和跳过项。
+- EPub 群组每日默认发言数从 5 条调整为 2 条，Peach 已签到 callback 超时降为 debug 日志。
+- Docker 镜像发布命名空间调整为 `elykia093/emby-keeper`，正式镜像不再同步 Hugging Face，开发镜像不再由 `main` 分支 push 自动触发。
+- 示例配置增加 `[checkiner.ai]`，并在站点列表中补充 `mooncake_ai`。
+
 [![build status](https://img.shields.io/github/actions/workflow/status/emby-keeper/emby-keeper/ci.yml?branch=main)](https://github.com/emby-keeper/emby-keeper/commits/main) [![pypi badge](https://img.shields.io/pypi/v/embykeeper)](https://pypi.org/project/embykeeper/) [![docker](https://img.shields.io/docker/v/embykeeper/embykeeper?label=docker)](https://hub.docker.com/r/embykeeper/embykeeper) [![docker pulls](https://img.shields.io/docker/pulls/embykeeper/embykeeper?label=pulls)](https://hub.docker.com/r/embykeeper/embykeeper) [![license badge](https://img.shields.io/github/license/emby-keeper/emby-keeper)](https://github.com/emby-keeper/emby-keeper/blob/main/LICENSE) [![telegram badge](https://img.shields.io/badge/telegram-bot-blue)](https://t.me/embykeeper_bot) [![telegram badge](https://img.shields.io/badge/telegram-channel-green)](https://t.me/embykeeper) [![telegram badge](https://img.shields.io/badge/telegram-group-violet)](https://t.me/embykeeperchat)
 
 <p align="center">
