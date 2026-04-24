@@ -220,9 +220,12 @@ class Emby:
         auth_header = ",".join([f"{k}={quote(str(v))}" for k, v in auth_headers.items()])
         full_auth_header = f'MediaBrowser Token={self.token or ""},Emby UserId={self.run_id},{auth_header}'
         headers["User-Agent"] = self.useragent or self.env.useragent
-        headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"
+        headers["Accept-Language"] = random.choice(
+            ("zh-CN,zh-Hans;q=0.9", "zh-CN,zh;q=0.9,en;q=0.6", "zh-Hans-CN,zh-Hans;q=0.9")
+        )
         headers["Content-Type"] = "application/json"
         headers["Accept"] = "*/*"
+        headers["Accept-Encoding"] = "gzip, deflate, br"
         headers["X-Emby-Authorization"] = full_auth_header
         if self.token:
             headers["X-Emby-Token"] = self.token
@@ -543,6 +546,7 @@ class Emby:
             )
 
         def get_playing_data(tick, update=False, stop=False):
+            paused = bool(update and random.random() < 0.08)
             data = {
                 "SubtitleOffset": 0,
                 "MaxStreamingBitrate": 420000000,
@@ -571,7 +575,7 @@ class Emby:
                     "AudioStreamIndex": -1,
                     "PlayMethod": "DirectStream",
                     "CanSeek": True,
-                    "IsPaused": False,
+                    "IsPaused": paused,
                 }
             )
             return data
@@ -581,25 +585,29 @@ class Emby:
             length = 0
             last_err_time = datetime.now()
             while True:
+                chunk_size = random.choice((4096, 8192, 16384, 32768, 65536))
+                max_recv_speed = random.randint(24 * 1024, 96 * 1024)
                 resp = await self._request(
                     method="GET",
                     path=url,
                     stream=True,
-                    max_recv_speed=1024,
+                    max_recv_speed=max_recv_speed,
                     timeout=None,
                     headers={
                         "Range": f"bytes={length}-",
-                        "User-Agent": "VLC/3.0.21 LibVLC/3.0.21",
+                        "User-Agent": self.useragent or self.env.useragent,
+                        "Accept": "video/*,*/*;q=0.9",
+                        "Accept-Encoding": "identity",
                         "X-Playback-Session-Id": play_session_id,
                     },
                 )
                 try:
-                    async for i in resp.aiter_content(chunk_size=1024):
+                    async for i in resp.aiter_content(chunk_size=chunk_size):
                         length += len(i)
                         del i
-                        await asyncio.sleep(random.random())
-                        if random.random() < 0.01:
-                            continue
+                        await asyncio.sleep(random.uniform(0.15, 1.4))
+                        if random.random() < 0.03:
+                            await asyncio.sleep(random.uniform(1.0, 4.0))
                 except RequestsError:
                     if (datetime.now() - last_err_time).total_seconds() > 5:
                         self.log.debug("流媒体文件访问错误, 正在重试.")
@@ -630,9 +638,9 @@ class Emby:
 
             last_report_t = t
             progress_errors = 0
-            report_interval = 5  # Start with 5 seconds
+            report_interval = random.uniform(7, 18)
             report_count = 0
-            max_interval = 300  # 5 minutes in seconds
+            max_interval = 240
             while t > 0:
                 if progress_errors > 12:
                     raise EmbyPlayError("播放状态设定错误次数过多")
@@ -640,14 +648,13 @@ class Emby:
                     self.log.info(f'正在播放: "{truncate_str(iname, 10)}" (还剩 {t:.0f} 秒).')
                     last_report_t = t
                     report_count += 1
-                    # After 3 reports at current interval, double the interval
                     if report_count >= 3:
                         report_count = 0
-                        report_interval = min(report_interval * 2, max_interval)
-                st = min(10, t)
+                        report_interval = min(report_interval * random.uniform(1.4, 2.2), max_interval)
+                st = min(random.uniform(6, 17), t)
                 await asyncio.sleep(st)
                 t -= st
-                tick = int((time - t) * 10000000)
+                tick = int(max(0, (time - t) + random.uniform(-1.5, 3.0)) * 10000000)
                 payload = get_playing_data(tick, update=True)
                 try:
                     resp = await asyncio.wait_for(
