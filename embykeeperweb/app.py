@@ -375,11 +375,12 @@ def run(
     app.register_blueprint(bp, url_prefix=app.config["BASE_PREFIX"])
     app.config["config"] = os.environ.get("EK_CONFIG", "")
     app.config["mongodb"] = os.environ.get("EK_MONGODB", "")
+    app.config["webpass"] = os.environ.get("EK_WEBPASS", "")
     if app.config["mongodb"]:
         ek_config.set(Config())
         ek_config.mongodb = app.config["mongodb"]
     if not wait:
-        start_proc(instant=True)
+        start_proc(instant=False)
     logger.info(f"Embykeeper webserver started at {host}:{port} with prefix {prefix or '/'}")
     socketio.run(app, port=port, host=host, debug=debug)
 

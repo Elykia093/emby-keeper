@@ -16,7 +16,7 @@ class EPubGroupChatCheckin(BotCheckin):
 
     async def send_checkin(self, retry=False):
         for _ in range(3):
-            times = self.config.get("times", 5)
+            times = self.config.get("times", 2)
             min_letters = self.config.get("letters", 7)
             prompt = self.config.get(
                 "prompt",

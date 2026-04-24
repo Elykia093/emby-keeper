@@ -129,7 +129,7 @@ window.addEventListener('DOMContentLoaded', function() {
         term.clear();
         term.reset();
 
-        const dims = { cols: term.cols, rows: term.rows, instant: true };
+        const dims = { cols: term.cols, rows: term.rows, instant: false };
         console.log("Sending embykeeper_start with dims:", dims);
         socket.emit("embykeeper_start", dims, (error) => {
             if (error) {
