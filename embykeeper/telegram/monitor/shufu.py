@@ -48,9 +48,7 @@ class ShufuMonitor(Monitor):
                     if "注册码已被使用" in (msg.text or msg.caption):
                         self.log.info(f'已向 Bot @{self.bot_username} 发送了邀请码: "{key}", 但是已被抢注了.')
                     else:
-                        self.log.bind(msg=True).info(
-                            f'已向 Bot @{self.bot_username} 发送了邀请码: "{key}", 请查看.'
-                        )
+                        self.log.bind(msg=True).info(f'已向 Bot @{self.bot_username} 发送了邀请码: "{key}", 请查看.')
                     break
                 else:
                     continue

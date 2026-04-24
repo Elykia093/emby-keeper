@@ -30,9 +30,7 @@ async def start(client: Client, message: Message):
 
 
 async def send_unexpected(client: Client, message: Message):
-    await client.send_message(
-        message.from_user.id, '你好, 目前本服务器正在排查自动化签到工具, 请输入"我是人"以排除你的嫌疑:'
-    )
+    await client.send_message(message.from_user.id, '你好, 目前本服务器正在排查自动化签到工具, 请输入"我是人"以排除你的嫌疑:')
 
 
 @app.async_command()

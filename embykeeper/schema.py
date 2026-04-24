@@ -19,9 +19,7 @@ class ConfigModel(BaseModel):
         allowed_fields = set(cls.model_fields.keys())
         extra_fields = set(values.keys()) - allowed_fields
         if extra_fields:
-            raise ValueError(
-                f"包含未知设置项：{', '.join(extra_fields)}, 允许的设置项: {', '.join(allowed_fields)}"
-            )
+            raise ValueError(f"包含未知设置项：{', '.join(extra_fields)}, 允许的设置项: {', '.join(allowed_fields)}")
         return values
 
 

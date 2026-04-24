@@ -138,9 +138,7 @@ class SmartMessager:
                         data = yaml.safe_load(f)
                         self.style_messages = data.get("messages", [])[:100]
 
-            self.log.bind(username=tg.me.full_name).info(
-                f"即将预测当前状态下应该发送的水群消息, 但不会实际发送, 仅用于测试."
-            )
+            self.log.bind(username=tg.me.full_name).info(f"即将预测当前状态下应该发送的水群消息, 但不会实际发送, 仅用于测试.")
 
             await self.send(dummy=True)
 
@@ -176,9 +174,7 @@ class SmartMessager:
             if start_datetime > end_datetime:
                 next_start_datetime = datetime.combine(date.today() + timedelta(days=1), start_time)
                 sleep_time = (next_start_datetime - datetime.now()).total_seconds()
-                self.log.info(
-                    f"已超过今日发送结束时间, 将在明天 {next_start_datetime.strftime('%H:%M:%S')} 重新进行规划."
-                )
+                self.log.info(f"已超过今日发送结束时间, 将在明天 {next_start_datetime.strftime('%H:%M:%S')} 重新进行规划.")
                 await asyncio.sleep(sleep_time)
                 continue
 
@@ -244,15 +240,11 @@ class SmartMessager:
                 )
 
                 if my_recent_5 >= self.max_count_recent_5:
-                    log.info(
-                        f"跳过发送: 已在最近 5 条消息中发送了 {my_recent_5} 条 (上限 {self.max_count_recent_5})"
-                    )
+                    log.info(f"跳过发送: 已在最近 5 条消息中发送了 {my_recent_5} 条 (上限 {self.max_count_recent_5})")
                     return None
 
                 if my_recent_10 >= self.max_count_recent_10:
-                    log.info(
-                        f"跳过发送: 已在最近 10 条消息中发送了 {my_recent_10} 条 (上限 {self.max_count_recent_10})"
-                    )
+                    log.info(f"跳过发送: 已在最近 10 条消息中发送了 {my_recent_10} 条 (上限 {self.max_count_recent_10})")
                     return None
             except Exception as e:
                 log.warning(f"检查近期消息数量失败: {e}")
@@ -366,9 +358,7 @@ class SmartMessager:
                             self.log.warning(f"检查消息相似度失败: {e}")
                             show_exception(e, regular=False)
                             return None
-                    log.info(
-                        f'即将在5秒后向聊天 "{chat.full_name}" 发送: [gray50]{truncate_str(answer, 20)}[/]'
-                    )
+                    log.info(f'即将在5秒后向聊天 "{chat.full_name}" 发送: [gray50]{truncate_str(answer, 20)}[/]')
                     await asyncio.sleep(5)
                     try:
                         msg = await tg.send_message(chat.id, answer)

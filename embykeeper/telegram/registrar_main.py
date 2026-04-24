@@ -166,9 +166,7 @@ class RegisterManager:
         time_range = f"<{times_str}>"
 
         def on_next_time(t: datetime):
-            logger.info(
-                f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的注册将在 {t.strftime('%m-%d %H:%M %p')} 进行."
-            )
+            logger.info(f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的注册将在 {t.strftime('%m-%d %H:%M %p')} 进行.")
             date_ctx = RunContext.get_or_create(f"registrar.date.{t.strftime('%Y%m%d')}")
             account_ctx = RunContext.get_or_create(f"registrar.account.{account.phone}")
             site_ctx = RunContext.get_or_create(f"registrar.site.{site_name}")
@@ -324,9 +322,7 @@ class RegisterManager:
         all_tasks = []
 
         for a in config.telegram.account:
-            logger.debug(
-                f"检查账户 {a.phone}: enabled={a.enabled}, registrar={getattr(a, 'registrar', False)}"
-            )
+            logger.debug(f"检查账户 {a.phone}: enabled={a.enabled}, registrar={getattr(a, 'registrar', False)}")
             if a.enabled and getattr(a, "registrar", False):
                 logger.debug(f"为账户 {a.phone} 安排注册任务")
                 schedulers_for_account, tasks_for_account = self.schedule_account(a)

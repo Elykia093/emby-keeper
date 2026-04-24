@@ -241,9 +241,7 @@ class Link:
 
             # No cache, perform auth
             if not log_func:
-                result = await self.post(
-                    f"/auth {service} {self.instance}", name=f"服务 {service.upper()} 认证"
-                )
+                result = await self.post(f"/auth {service} {self.instance}", name=f"服务 {service.upper()} 认证")
                 authed_services.setdefault(self.client.me.id, {})[service] = bool(result)
                 return bool(result)
             else:
@@ -319,9 +317,7 @@ class Link:
 
     async def pornemby_answer(self, question: str) -> Tuple[Optional[str], Optional[str]]:
         """向机器人发送问题回答请求."""
-        results = await self.post(
-            f"/pornemby_answer {self.instance} {question}", timeout=20, name="请求问题回答"
-        )
+        results = await self.post(f"/pornemby_answer {self.instance} {question}", timeout=20, name="请求问题回答")
         if results:
             return results.get("answer", None), results.get("by", None)
         else:
@@ -329,9 +325,7 @@ class Link:
 
     async def terminus_answer(self, question: str) -> Tuple[Optional[str], Optional[str]]:
         """向机器人发送问题回答请求."""
-        results = await self.post(
-            f"/terminus_answer {self.instance} {question}", timeout=20, name="请求问题回答"
-        )
+        results = await self.post(f"/terminus_answer {self.instance} {question}", timeout=20, name="请求问题回答")
         if results:
             return results.get("answer", None), results.get("by", None)
         else:
@@ -373,8 +367,7 @@ class Link:
     def _normalize_ai_content(content):
         if isinstance(content, list):
             content = "".join(
-                item.get("text", "") if isinstance(item, dict) else str(item)
-                for item in content
+                item.get("text", "") if isinstance(item, dict) else str(item) for item in content
             )
         return (content or "").strip()
 
@@ -446,9 +439,7 @@ class Link:
             return None, None
         answer = self._strip_think_content(answer)
         if not answer:
-            self.log.warning(
-                f"请求智能回答失败: 智谱 AI 仅返回思维链或空内容, 原始响应预览: {self._preview_ai_content(content)}."
-            )
+            self.log.warning(f"请求智能回答失败: 智谱 AI 仅返回思维链或空内容, 原始响应预览: {self._preview_ai_content(content)}.")
             return None, None
         self.log.info("服务请求完成: 请求智能回答 (智谱 AI)")
         return answer, f"zhipu:{model_id}"
@@ -481,10 +472,7 @@ class Link:
             return None, None
 
         option_lines = "\n".join(f"- {option}" for option in options)
-        prompt = (
-            "你在帮助 Telegram 签到验证码识别。"
-            "请根据图片内容，只从候选项中选择唯一正确的一项。"
-        )
+        prompt = "你在帮助 Telegram 签到验证码识别。" "请根据图片内容，只从候选项中选择唯一正确的一项。"
         if question:
             prompt += f"\n题目或提示: {question}"
         prompt += (
@@ -519,9 +507,7 @@ class Link:
 
         answer = self._extract_answer_tag(self._strip_think_content(self._normalize_ai_content(content)))
         if not answer:
-            self.log.warning(
-                f"请求视觉问题解答失败: 智谱 AI 未返回可用答案, 原始响应预览: {self._preview_ai_content(content)}."
-            )
+            self.log.warning(f"请求视觉问题解答失败: 智谱 AI 未返回可用答案, 原始响应预览: {self._preview_ai_content(content)}.")
             return None, None
 
         if answer in options:
@@ -530,10 +516,7 @@ class Link:
 
         matched = process.extractOne(answer, options)
         if not matched or matched[1] < 70:
-            self.log.warning(
-                f'请求视觉问题解答失败: 返回答案 "{answer}" 无法匹配候选项 {options}, '
-                f'最佳匹配结果: {matched}.'
-            )
+            self.log.warning(f'请求视觉问题解答失败: 返回答案 "{answer}" 无法匹配候选项 {options}, ' f"最佳匹配结果: {matched}.")
             return None, None
 
         self.log.info("服务请求完成: 请求视觉问题解答 (智谱 AI)")

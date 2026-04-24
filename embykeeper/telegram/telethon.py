@@ -89,13 +89,9 @@ class TelethonUtils:
                 # bot_token's first part has the bot ID, but it may be invalid
                 # so don't try to parse as int (instead cast our ID to string).
                 if bot_token[: bot_token.find(":")] != str(me.id):
-                    logger.warning(
-                        "该会话已经包含一个授权用户,所以没有使用提供的 bot_token 登录机器人账号(可能导致没有使用你期望的用户)"
-                    )
+                    logger.warning("该会话已经包含一个授权用户,所以没有使用提供的 bot_token 登录机器人账号(可能导致没有使用你期望的用户)")
             elif phone and not callable(phone) and utils.parse_phone(phone) != me.phone:
-                logger.warning(
-                    "该会话已经包含一个授权用户,所以没有使用提供的手机号登录账号 (可能导致没有使用你期望的用户)"
-                )
+                logger.warning("该会话已经包含一个授权用户,所以没有使用提供的手机号登录账号 (可能导致没有使用你期望的用户)")
 
             return self.client
 

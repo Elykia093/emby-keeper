@@ -123,9 +123,7 @@ class CheckinerManager:
         phone_masked = TelegramAccount.get_phone_masked(account.phone)
 
         def on_next_time(t: datetime):
-            logger.info(
-                f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的签到将在 {t.strftime('%m-%d %H:%M %p')} 进行."
-            )
+            logger.info(f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的签到将在 {t.strftime('%m-%d %H:%M %p')} 进行.")
             date_ctx = RunContext.get_or_create(f"checkiner.date.{t.strftime('%Y%m%d')}")
             account_ctx = RunContext.get_or_create(f"checkiner.account.{account.phone}")
             site_ctx = RunContext.get_or_create(f"checkiner.site.{site_name}")

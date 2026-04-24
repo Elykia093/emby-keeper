@@ -37,9 +37,7 @@ async def check_captcha(client: Client, callback_query: CallbackQuery):
         return
 
     # Log the user's choice and send success message
-    logger.info(
-        f"用户 {callback_query.from_user.username or user_id} 完成签到，选择了：{callback_query.data}"
-    )
+    logger.info(f"用户 {callback_query.from_user.username or user_id} 完成签到，选择了：{callback_query.data}")
     await callback_query.answer()
 
     del user_states[user_id]

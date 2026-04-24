@@ -76,9 +76,7 @@ class SubsonicManager:
         if len(accounts) == 1:
             logger.bind(log=True).info(f"保活成功: {', '.join(successful_accounts)}.")
         else:
-            logger.bind(log=True).info(
-                f"保活成功 ({len(tasks)}/{len(tasks)}): {', '.join(successful_accounts)}."
-            )
+            logger.bind(log=True).info(f"保活成功 ({len(tasks)}/{len(tasks)}): {', '.join(successful_accounts)}.")
         return ctx.finish(RunStatus.SUCCESS, f"保活成功")
 
     async def run_all(self, instant: bool = False):

@@ -248,7 +248,6 @@ class Emby:
         )
 
     async def _request(self, method: str, path: str, _login=False, **kw) -> Response:
-
         if path.startswith(("http://", "https://")):
             url = path
         else:
@@ -299,21 +298,14 @@ class Emby:
                     '或者, 高级用户可以使用 "cf_challenge = true" 配置项以允许尝试解析验证码.'
                 )
             else:
-                self.log.warning(
-                    f'该站点已启用 Cloudflare 保护, 请使用 "cf_challenge = true" 配置项以允许尝试解析验证码.'
-                )
+                self.log.warning(f'该站点已启用 Cloudflare 保护, 请使用 "cf_challenge = true" 配置项以允许尝试解析验证码.')
         self.log.info(f"该站点已启用 Cloudflare 保护, 即将请求解析.")
         if self.proxy:
             if self.proxy.scheme != "socks5":
-                self.log.warning(
-                    f"该站点验证解析仅支持 SOCKS5 代理, 由于当前代理协议不支持, 将尝试不使用代理."
-                )
+                self.log.warning(f"该站点验证解析仅支持 SOCKS5 代理, 由于当前代理协议不支持, 将尝试不使用代理.")
                 self.a.use_proxy = False
             else:
-                self.log.info(
-                    f"验证码解析将使用代理, 可能导致解析失败, 若失败请使用"
-                    '"use_proxy = false" 以禁用该站点的代理.'
-                )
+                self.log.info(f"验证码解析将使用代理, 可能导致解析失败, 若失败请使用" '"use_proxy = false" 以禁用该站点的代理.')
         try:
             cf_clearance, useragent = await get_cf_clearance(self.a.url, self.proxy)
             if not cf_clearance:
@@ -960,9 +952,7 @@ class Emby:
                     if failed_reasons["wrong_type"]:
                         reasons.append(f"{failed_reasons['wrong_type']} 个非视频项目")
                     if failed_reasons["short_length"]:
-                        reasons.append(
-                            f"{failed_reasons['short_length']} 个视频时长不足 (未开启 allow_multiple)"
-                        )
+                        reasons.append(f"{failed_reasons['short_length']} 个视频时长不足 (未开启 allow_multiple)")
                     self.log.warning(f"所有视频均不符合要求, 保活失败. 其中: {', '.join(reasons)}")
                 elif played_time > last_played_time:
                     last_played_time = played_time

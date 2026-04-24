@@ -42,9 +42,7 @@ class SubsonicPlayer:
         try:
             info = await client.ping()
             if info.is_ok:
-                self.log.info(
-                    f'成功连接至服务器 ({(info.type or "unknown").capitalize()} {info.version or "X.X"}).'
-                )
+                self.log.info(f'成功连接至服务器 ({(info.type or "unknown").capitalize()} {info.version or "X.X"}).')
                 return client
             else:
                 self.log.error(f"服务器登陆错误, 请重新检查配置: {info.error_message}")

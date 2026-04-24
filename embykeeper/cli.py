@@ -102,9 +102,7 @@ def print_help(ctx: typer.Context, param: typer.CallbackParam, value: bool):
 
 
 @app.async_command(
-    help=(
-        f"欢迎使用 [orange3]{__product__.capitalize()}[/] {__version__} " ":cinema: 无参数默认开启全部功能."
-    )
+    help=(f"欢迎使用 [orange3]{__product__.capitalize()}[/] {__version__} " ":cinema: 无参数默认开启全部功能.")
 )
 async def main(
     config_file: Path = typer.Argument(
@@ -401,9 +399,7 @@ async def main(
         messager = True
         registrar = True
 
-    config.on_change(
-        "proxy", lambda x, y: logger.bind(scheme="config").warning("修改代理设置后, 可能需要重启程序以生效.")
-    )
+    config.on_change("proxy", lambda x, y: logger.bind(scheme="config").warning("修改代理设置后, 可能需要重启程序以生效."))
 
     if config.mongodb and not var.use_mongodb_config:
         if config.proxy:

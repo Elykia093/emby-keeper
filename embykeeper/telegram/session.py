@@ -90,9 +90,7 @@ class ClientsSession:
                 logger.debug(f'正在停止账号 "{phone_masked}" 上的监听和任务.')
                 cls.pool.pop(phone, None)
                 if client.stop_handlers:
-                    logger.debug(
-                        f'开始执行账号 "{phone_masked}" 的停止处理程序, 共 {len(client.stop_handlers)} 个.'
-                    )
+                    logger.debug(f'开始执行账号 "{phone_masked}" 的停止处理程序, 共 {len(client.stop_handlers)} 个.')
                     try:
                         await asyncio.wait_for(
                             asyncio.gather(*[h() for h in client.stop_handlers], return_exceptions=True),
@@ -152,19 +150,13 @@ class ClientsSession:
                     return False
         except httpx.ProxyError as e:
             if proxy_str:
-                logger.warning(
-                    f"无法连接到您的代理 ({proxy_str}), 您的网络状态可能不好, 敬请注意. 程序将继续运行."
-                )
+                logger.warning(f"无法连接到您的代理 ({proxy_str}), 您的网络状态可能不好, 敬请注意. 程序将继续运行.")
             return False
         except (httpx.ConnectError, httpx.ConnectTimeout):
             if self.proxy:
-                logger.warning(
-                    f"无法连接到 Telegram 服务器, 您的网络状态可能不好, 或代理无法连接, 敬请注意. 程序将继续运行."
-                )
+                logger.warning(f"无法连接到 Telegram 服务器, 您的网络状态可能不好, 或代理无法连接, 敬请注意. 程序将继续运行.")
             else:
-                logger.warning(
-                    f"无法连接到 Telegram 服务器, 您的网络状态可能不好, 敬请注意. 您可以通过配置文件设置代理. 程序将继续运行."
-                )
+                logger.warning(f"无法连接到 Telegram 服务器, 您的网络状态可能不好, 敬请注意. 您可以通过配置文件设置代理. 程序将继续运行.")
             return False
         except Exception as e:
             logger.warning(f"检测网络状态时发生错误, 网络检测将被跳过.")
@@ -184,9 +176,7 @@ class ClientsSession:
                     return False
                 nowtime = datetime.now(timezone.utc).timestamp()
                 if abs(nowtime - timestamp / 1000) > 30:
-                    logger.warning(
-                        f"您的系统时间设置不正确, 与世界时间差距过大, 可能会导致连接失败, 敬请注意. 程序将继续运行."
-                    )
+                    logger.warning(f"您的系统时间设置不正确, 与世界时间差距过大, 可能会导致连接失败, 敬请注意. 程序将继续运行.")
         except httpx.HTTPError:
             logger.warning(f"检测世界时间发生错误, 时间检测将被跳过.")
             return False
@@ -324,9 +314,7 @@ class ClientsSession:
                     except Exception as e:
                         logger.warning(f"读取旧版本登录文件时发生错误, 请重新登陆.")
                 if session_str:
-                    logger.debug(
-                        f'账号 "{phone_masked}" 登录凭据存在, 仅内存模式{"启用" if self.in_memory else "禁用"}.'
-                    )
+                    logger.debug(f'账号 "{phone_masked}" 登录凭据存在, 仅内存模式{"启用" if self.in_memory else "禁用"}.')
                 else:
                     is_newly_created_session = True
                     logger.debug(
@@ -337,9 +325,7 @@ class ClientsSession:
                         try:
                             session_str = await self.get_session_str_from_telethon(account)
                         except EOFError:
-                            logger.warning(
-                                "非可交互终端, 无法输入验证码, 如果您使用 docker 请使用 docker -it 运行, 否则请使用可交互终端."
-                            )
+                            logger.warning("非可交互终端, 无法输入验证码, 如果您使用 docker 请使用 docker -it 运行, 否则请使用可交互终端.")
                             logger.error(f'登录账号 "{phone_masked}" 时发生异常, 将被跳过.')
                             return None
                         if session_str:
@@ -376,9 +362,7 @@ class ClientsSession:
                         except Exception:
                             pass
                         if self.proxy:
-                            logger.error(
-                                f"无法连接到 Telegram 服务器, 请检查您代理的可用性, 正在重试 ({i+1} / 3)."
-                            )
+                            logger.error(f"无法连接到 Telegram 服务器, 请检查您代理的可用性, 正在重试 ({i+1} / 3).")
                             await asyncio.sleep(3)
                             continue
                         else:
@@ -417,9 +401,7 @@ class ClientsSession:
                         show_exception(e)
                     await asyncio.sleep(3)
                 except KeyError as e:
-                    logger.warning(
-                        f'登录账号 "{phone_masked}" 时发生异常, 可能是由于网络错误, 将在 3 秒后重试.'
-                    )
+                    logger.warning(f'登录账号 "{phone_masked}" 时发生异常, 可能是由于网络错误, 将在 3 秒后重试.')
                     show_exception(e)
                     await asyncio.sleep(3)
             else:
@@ -432,9 +414,7 @@ class ClientsSession:
             return None
         except BadMsgNotification as e:
             if "synchronized" in str(e):
-                logger.error(
-                    f'登录账号 "{phone_masked}" 时发生异常, 可能是因为您的系统时间与世界时间差距过大, 将被跳过.'
-                )
+                logger.error(f'登录账号 "{phone_masked}" 时发生异常, 可能是因为您的系统时间与世界时间差距过大, 将被跳过.')
                 return None
             else:
                 logger.error(f'登录账号 "{phone_masked}" 时发生异常, 将被跳过.')

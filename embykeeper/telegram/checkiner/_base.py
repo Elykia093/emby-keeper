@@ -265,9 +265,7 @@ class BotCheckin(BaseBotCheckin):
                     self.log.info(f"初始化信息: Telegram 要求等待 {e.value} 秒.")
                     await asyncio.sleep(e.value)
                 else:
-                    self.log.info(
-                        f"初始化信息: Telegram 要求等待 {e.value} 秒, 您可能操作过于频繁, 签到器将停止."
-                    )
+                    self.log.info(f"初始化信息: Telegram 要求等待 {e.value} 秒, 您可能操作过于频繁, 签到器将停止.")
                     return self.ctx.finish(RunStatus.FAIL, "操作过于频繁")
             else:
                 break
@@ -379,9 +377,7 @@ class BotCheckin(BaseBotCheckin):
                 self.log.warning("无法在时限内完成签到.")
                 return self.ctx.finish(RunStatus.FAIL, "无法在时限内完成签到")
             elif self.current_retries <= self.valid_retries:
-                if (
-                    self.ctx.status == RunStatus.NONEED
-                ):  # 已签到的情况, 如果设置了 checked_retries, 则返回重计划请求
+                if self.ctx.status == RunStatus.NONEED:  # 已签到的情况, 如果设置了 checked_retries, 则返回重计划请求
                     if self.checked_retries:
                         if self.ctx.reschedule and self.ctx.reschedule > self.checked_retries:
                             return self.ctx.finish(RunStatus.NONEED)
@@ -593,9 +589,7 @@ class BotCheckin(BaseBotCheckin):
                     matches = re.search(self.bot_success_pat, text)
                     if matches:
                         try:
-                            self.log.info(
-                                f"[yellow]签到成功[/]: + {matches.group(1)} 分 -> {matches.group(2)} 分."
-                            )
+                            self.log.info(f"[yellow]签到成功[/]: + {matches.group(1)} 分 -> {matches.group(2)} 分.")
                         except IndexError:
                             try:
                                 self.log.info(f"[yellow]签到成功[/]: 当前/增加 {matches.group(1)} 分.")
@@ -635,14 +629,10 @@ class BotCheckin(BaseBotCheckin):
                 buttons = []
             button_specs = [f"'{b}'" for b in buttons]
             prompt = (
-                "我正在进行签到, 机器将显示指令或状态, 我需要通过回答问题以避免被识别为机器人或自动化程序, 并希望完成签到, 现在机器给出的值为:\n\n"
-                f"{content}\n\n"
+                "我正在进行签到, 机器将显示指令或状态, 我需要通过回答问题以避免被识别为机器人或自动化程序, 并希望完成签到, 现在机器给出的值为:\n\n" f"{content}\n\n"
             )
             if buttons:
-                prompt += (
-                    f"你可选: {', '.join(button_specs)} 中的一个作为回答.\n"
-                    "形式为: [CLICK]^XXX^, 其中XXX为回答\n"
-                )
+                prompt += f"你可选: {', '.join(button_specs)} 中的一个作为回答.\n" "形式为: [CLICK]^XXX^, 其中XXX为回答\n"
             prompt += (
                 "如果您认为不应该进行任何操作, 请输出 [NO_RESP], 禁止输出其他内容.\n"
                 "如果这是一个指令, 请输出您需要发送或点击的内容.\n"
@@ -664,9 +654,7 @@ class BotCheckin(BaseBotCheckin):
                             return True
                     elif "[IS_STATUS]" in answer:
                         if unexpected:
-                            self.log.info(
-                                f"智能回答认为这是一条状态信息, 无需进行操作, 为了避免风险签到器将停止."
-                            )
+                            self.log.info(f"智能回答认为这是一条状态信息, 无需进行操作, 为了避免风险签到器将停止.")
                             await self.fail()
                             return False
                         else:

@@ -134,9 +134,7 @@ async def callback_checkin(client: Client, callback: CallbackQuery):
 async def callback_verify(client: Client, callback: CallbackQuery):
     if "correct" in callback.data:
         signed[callback.from_user.id] = True
-        await callback.message.edit_caption(
-            caption="签到获得积分: 5\n当前积分: 5", reply_markup=result_reply_markup
-        )
+        await callback.message.edit_caption(caption="签到获得积分: 5\n当前积分: 5", reply_markup=result_reply_markup)
     await callback.answer()
 
 

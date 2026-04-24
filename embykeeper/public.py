@@ -66,12 +66,8 @@ async def interactive_config(mongodb_url: str = None):
             pad + "请输入您的 Telegram 账号 (带国家区号) [dark_green](+861xxxxxxxxxx)[/]",
             console=console,
         )
-        monitor = Confirm.ask(
-            pad + "是否开启该账号的自动监控功能? (需要高级账号)", default=False, console=console
-        )
-        messager = Confirm.ask(
-            pad + "是否开启该账号的自动水群功能? (需要高级账号)", default=False, console=console
-        )
+        monitor = Confirm.ask(pad + "是否开启该账号的自动监控功能? (需要高级账号)", default=False, console=console)
+        messager = Confirm.ask(pad + "是否开启该账号的自动水群功能? (需要高级账号)", default=False, console=console)
         telegram_accounts.append(TelegramAccount(phone=phone, monitor=monitor, messager=messager))
     if telegram_accounts:
         logger.info(f"即将尝试登录各账户并存储凭据, 请耐心等待.")
@@ -86,9 +82,7 @@ async def interactive_config(mongodb_url: str = None):
             more = Confirm.ask(pad + "是否添加 Emby 账号?", default=True, console=console)
         if not more:
             break
-        url = Prompt.ask(
-            pad + "请输入您的 Emby 站点 URL [dark_green](https://abc.com:443)[/]", console=console
-        )
+        url = Prompt.ask(pad + "请输入您的 Emby 站点 URL [dark_green](https://abc.com:443)[/]", console=console)
         username = Prompt.ask(pad + "请输入您在该 Emby 站点的用户名", console=console)
         password = Prompt.ask(
             pad + "请输入您在该 Emby 站点的密码 (不显示, 按回车确认)",
@@ -168,9 +162,7 @@ async def interactive_config(mongodb_url: str = None):
         cache.set("config", content)
         logger.info(f"您的配置已生成完毕并已存储到 MongoDB 数据库.")
     else:
-        logger.info(
-            f"您的配置[green]已生成完毕[/]! 您需要将以下内容写入托管平台的 EK_CONFIG 环境变量 ([red]SECRET[/]), 否则配置将在重启后丢失."
-        )
+        logger.info(f"您的配置[green]已生成完毕[/]! 您需要将以下内容写入托管平台的 EK_CONFIG 环境变量 ([red]SECRET[/]), 否则配置将在重启后丢失.")
         console.print()
         console.rule("EK_CONFIG")
         console.print(content)
@@ -216,8 +208,7 @@ async def prepare_config_str(config_str: str, mongodb_url: str = None):
             logger.info(f"您已登陆到 Telegram! 相关凭据已存储到 MongoDB 数据库.")
         else:
             logger.info(
-                f"您已登陆到 Telegram! 您需要将以下内容重新写入托管平台的 EK_CONFIG 环境变量 ([red]SECRET[/]), "
-                "否则登陆状态将在重启后丢失."
+                f"您已登陆到 Telegram! 您需要将以下内容重新写入托管平台的 EK_CONFIG 环境变量 ([red]SECRET[/]), " "否则登陆状态将在重启后丢失."
             )
             console.print()
             console.rule("EK_CONFIG")

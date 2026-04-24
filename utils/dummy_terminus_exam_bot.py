@@ -45,9 +45,7 @@ async def exam(client: Client, message: Message):
     user_states[user_id] = {"waiting_for_exam_choice": True}
 
     # Send initial exam information
-    initial_message = (
-        "通过考核才能注册 Emby 公益服账号或继续使用账号，是否开始考核？ ( 本次考核需要消耗 40 积分 )"
-    )
+    initial_message = "通过考核才能注册 Emby 公益服账号或继续使用账号，是否开始考核？ ( 本次考核需要消耗 40 积分 )"
     keyboard = ReplyKeyboardMarkup([["✅ 开始", "🚫 放弃"]], resize_keyboard=True, one_time_keyboard=True)
     await client.send_message(user_id, initial_message, reply_markup=keyboard)
 
@@ -64,8 +62,7 @@ async def handle_exam_choice(client: Client, message: Message):
     if choice == "✅ 开始":
         # Send exam start message
         start_message = (
-            "考核开始，限时 20 分钟，90 分及格，你可以随时使用 /cancel 命令放弃考核，"
-            "但每次考核间隔需大于 72 个小时 ( 如果选项按钮显示不全，请把手机横过来或使用电脑作答 )"
+            "考核开始，限时 20 分钟，90 分及格，你可以随时使用 /cancel 命令放弃考核，" "但每次考核间隔需大于 72 个小时 ( 如果选项按钮显示不全，请把手机横过来或使用电脑作答 )"
         )
         await client.send_message(user_id, start_message, reply_markup=ReplyKeyboardRemove())
 
@@ -153,7 +150,9 @@ async def end_exam(client: Client, user_id):
     state = user_states[user_id]
     score = state["score"]
     passed = score >= 90
-    result_text = f"考试结束！\n\n成绩 {score} 分，考核{'通过' if passed else '失败'}，{'恭喜你通过考核！' if passed else '需要 90 分才能及格'}"
+    result_text = (
+        f"考试结束！\n\n成绩 {score} 分，考核{'通过' if passed else '失败'}，{'恭喜你通过考核！' if passed else '需要 90 分才能及格'}"
+    )
 
     await client.edit_message_text(user_id, state["message_id"], result_text, reply_markup=None)
     del user_states[user_id]

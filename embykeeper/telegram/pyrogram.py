@@ -389,18 +389,14 @@ class Client(pyrogram.Client):
                     try:
                         self.phone_code = Prompt.ask(" " * 23 + msg, console=var.console)
                     except EOFError:
-                        raise BadRequest(
-                            f'登录 "{self.phone_number}" 时出现异常: 您正在使用非交互式终端, 无法输入验证码.'
-                        )
+                        raise BadRequest(f'登录 "{self.phone_number}" 时出现异常: 您正在使用非交互式终端, 无法输入验证码.')
                 signed_in = await self.sign_in(self.phone_number, sent_code.phone_code_hash, self.phone_code)
             except (CodeInvalid, PhoneCodeInvalid):
                 self.phone_code = None
                 retry = True
                 attempts += 1
                 if attempts >= 3:
-                    raise BadRequest(
-                        f'登录 "{self.phone_number}" 时出现异常: 验证码尝试次数过多, 请稍后重试.'
-                    )
+                    raise BadRequest(f'登录 "{self.phone_number}" 时出现异常: 验证码尝试次数过多, 请稍后重试.')
                 await asyncio.sleep(3)
             except SessionPasswordNeeded:
                 retry = False
@@ -419,9 +415,7 @@ class Client(pyrogram.Client):
             except FloodWait:
                 raise BadRequest(f'登录 "{self.phone_number}" 时出现异常: 登录过于频繁.')
             except PhoneNumberInvalid:
-                raise BadRequest(
-                    f'登录 "{self.phone_number}" 时出现异常: 您使用了错误的手机号 (格式错误或没有注册).'
-                )
+                raise BadRequest(f'登录 "{self.phone_number}" 时出现异常: 您使用了错误的手机号 (格式错误或没有注册).')
             except PhoneNumberBanned:
                 raise BadRequest(f'登录 "{self.phone_number}" 时出现异常: 您的账户已被封禁.')
             except Exception as e:

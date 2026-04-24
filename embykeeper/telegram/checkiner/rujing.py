@@ -121,9 +121,7 @@ class RujingCheckin(TemplateACheckin):
                                 return await self.fail()
 
                         except (httpx.ProxyError, httpx.TimeoutException, OSError):
-                            self.log.warning(
-                                f"无法连接到站点的页面, 可能是您的网络或代理不稳定, 正在重试 ({i+1}/10)."
-                            )
+                            self.log.warning(f"无法连接到站点的页面, 可能是您的网络或代理不稳定, 正在重试 ({i+1}/10).")
                             continue
                     else:
                         self.log.warning(f'无法连接到站点的页面: "{url_submit}", 可能是您的网络或代理不稳定.')

@@ -31,9 +31,7 @@ class _PornfansExamResultMonitor(Monitor):
 class _PornfansExamAnswerMonitor(Monitor):
     name = "PornFans 科举"
     chat_user = ["Porn_Emby_Bot", "Porn_emby_ScriptsBot"]
-    chat_keyword = (
-        r"问题\d*：根据以上封面图, 猜猜是什么番号？\n+A:(.*)\n+B:(.*)\n+C:(.*)\n+D:(.*)\n(?!\n*答案)"
-    )
+    chat_keyword = r"问题\d*：根据以上封面图, 猜猜是什么番号？\n+A:(.*)\n+B:(.*)\n+C:(.*)\n+D:(.*)\n(?!\n*答案)"
     additional_auth = ["pornemby_pack"]
     allow_edit = True
 
@@ -52,10 +50,7 @@ class _PornfansExamAnswerMonitor(Monitor):
                 self.log.warning(f"站点验证解析仅支持 SOCKS5 代理, 由于当前代理协议不支持, 将尝试不使用代理.")
                 self.proxy = None
             else:
-                self.log.info(
-                    f"验证码解析将使用代理, 可能导致解析失败, 若失败请使用"
-                    '"use_proxy = false" 以禁用该站点的代理.'
-                )
+                self.log.info(f"验证码解析将使用代理, 可能导致解析失败, 若失败请使用" '"use_proxy = false" 以禁用该站点的代理.')
         try:
             cf_clearance, useragent = await get_cf_clearance(JAVDATABASE_URL, self.proxy)
             if not cf_clearance:
@@ -128,9 +123,7 @@ class _PornfansExamAnswerMonitor(Monitor):
                     detail_url = f"{JAVDATABASE_URL}/movies/{code.lower()}/"
                     resp: Response = await session.get(detail_url)
                     if resp.status_code != 200:
-                        self.log.warning(
-                            f"获取影片详情失败: 网址访问错误: {detail_url} ({resp.status_code})."
-                        )
+                        self.log.warning(f"获取影片详情失败: 网址访问错误: {detail_url} ({resp.status_code}).")
                         retry_count += 1
                         if retry_count < max_retries:
                             self.log.info(f"正在进行第 {retry_count + 1} 次重试...")
@@ -148,17 +141,13 @@ class _PornfansExamAnswerMonitor(Monitor):
                     if img_response.status_code == 200:
                         return BytesIO(img_response.content)
                     else:
-                        self.log.warning(
-                            f"获取封面图片失败: 网址访问错误: {img_url} ({img_response.status_code})."
-                        )
+                        self.log.warning(f"获取封面图片失败: 网址访问错误: {img_url} ({img_response.status_code}).")
                         return None
 
             except Exception as e:
                 retry_count += 1
                 if retry_count < max_retries:
-                    self.log.info(
-                        f"获取封面图片失败, 正在进行第 {retry_count + 1} 次重试: {e.__class__.__name__}: {str(e)}"
-                    )
+                    self.log.info(f"获取封面图片失败, 正在进行第 {retry_count + 1} 次重试: {e.__class__.__name__}: {str(e)}")
                     continue
                 self.log.warning(f"获取封面图片失败: {e.__class__.__name__}: {str(e)}")
                 show_exception(e)
@@ -186,9 +175,7 @@ class _PornfansExamAnswerMonitor(Monitor):
                     # 获取 content_id
                     resp: Response = await session.get(detail_url)
                     if resp.status_code != 200:
-                        self.log.warning(
-                            f"获取影片详情失败: 网址访问错误: {detail_url} ({resp.status_code})."
-                        )
+                        self.log.warning(f"获取影片详情失败: 网址访问错误: {detail_url} ({resp.status_code}).")
                         retry_count += 1
                         if retry_count < max_retries:
                             self.log.info(f"正在进行第 {retry_count + 1} 次重试...")
@@ -204,9 +191,7 @@ class _PornfansExamAnswerMonitor(Monitor):
                     combined_url = f"https://r18.dev/videos/vod/movies/detail/-/combined={content_id}/json"
                     resp: Response = await session.get(combined_url)
                     if resp.status_code != 200:
-                        self.log.warning(
-                            f"获取封面详情失败: 网址访问错误: {combined_url} ({resp.status_code})."
-                        )
+                        self.log.warning(f"获取封面详情失败: 网址访问错误: {combined_url} ({resp.status_code}).")
                         return None
                     combined_json = resp.json()
                     jacket_url = combined_json.get("jacket_thumb_url")
@@ -219,17 +204,13 @@ class _PornfansExamAnswerMonitor(Monitor):
                     if img_response.status_code == 200:
                         return BytesIO(img_response.content)
                     else:
-                        self.log.warning(
-                            f"获取封面图片失败: 网址访问错误: {jacket_url} ({img_response.status_code})."
-                        )
+                        self.log.warning(f"获取封面图片失败: 网址访问错误: {jacket_url} ({img_response.status_code}).")
                         return None
 
             except Exception as e:
                 retry_count += 1
                 if retry_count < max_retries:
-                    self.log.info(
-                        f"获取封面图片失败, 正在进行第 {retry_count + 1} 次重试: {e.__class__.__name__}: {str(e)}"
-                    )
+                    self.log.info(f"获取封面图片失败, 正在进行第 {retry_count + 1} 次重试: {e.__class__.__name__}: {str(e)}")
                     continue
                 self.log.warning(f"获取封面图片失败: {e.__class__.__name__}: {str(e)}")
                 show_exception(e)

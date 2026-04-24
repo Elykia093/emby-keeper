@@ -71,9 +71,7 @@ class RunContext(BaseModel):
 
         if status:
             self.status = status
-            self.log.append(
-                LogRecord(level="DEBUG", message=f"任务状态已设置为 {status.name}", time=datetime.now())
-            )
+            self.log.append(LogRecord(level="DEBUG", message=f"任务状态已设置为 {status.name}", time=datetime.now()))
 
     def finish(self, status: RunStatus = None, status_info: str = None):
         """完成任务, 记录状态和时间, 并保存到缓存"""

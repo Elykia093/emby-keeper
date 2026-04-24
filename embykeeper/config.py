@@ -166,11 +166,7 @@ class ConfigManager(ProxyBase):
         doc.add(comment("=" * 80))
         c = item({})
         c.add(nl())
-        c.add(
-            comment(
-                '每次进行进行 Emby 保活的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):'
-            )
-        )
+        c.add(comment('每次进行进行 Emby 保活的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):'))
         c["time_range"] = default_config.emby.time_range
         c.add(nl())
         c.add(comment("每隔几天进行 Emby 保活:"))
@@ -236,11 +232,7 @@ class ConfigManager(ProxyBase):
         doc.add(comment("=" * 80))
         c = item({})
         c.add(nl())
-        c.add(
-            comment(
-                '每次进行进行 Telegram 签到的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):'
-            )
-        )
+        c.add(comment('每次进行进行 Telegram 签到的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):'))
         c["time_range"] = default_config.checkiner.time_range
         c.add(nl())
         c.add(comment("各个站点签到将在开始后, 等待一定时间随机启动, 使各站点错开 (分钟):"))
@@ -435,9 +427,7 @@ class ConfigManager(ProxyBase):
 
         doc.add(comment("=" * 80))
         doc.add(comment("代理相关设置"))
-        doc.add(
-            comment("代理设置, Emby 和 Telegram 均将通过此代理连接, 服务器位于国内时请配置代理并取消注释")
-        )
+        doc.add(comment("代理设置, Emby 和 Telegram 均将通过此代理连接, 服务器位于国内时请配置代理并取消注释"))
         doc.add(comment(f"详见: https://emby-keeper.github.io/guide/配置文件#proxy-子项"))
         doc.add(comment("=" * 80))
         doc.add(nl())
@@ -465,11 +455,7 @@ class ConfigManager(ProxyBase):
         c["enabled"] = True
         c.add(comment("使用第几个 Telegram 账号进行推送, 从 1 开始计数:"))
         c["account"] = 1
-        c.add(
-            comment(
-                "默认情况下, 日志推送将在每天指定时间统一推送 (在 @embykeeper_bot 设置), 设置为 false 以立刻推送"
-            )
-        )
+        c.add(comment("默认情况下, 日志推送将在每天指定时间统一推送 (在 @embykeeper_bot 设置), 设置为 false 以立刻推送"))
         c["immediately"] = False
         c.add(comment("默认情况下, 启动时立刻执行的一次签到/保活不会推送消息, 设置为 true 以推送"))
         c["once"] = False
@@ -486,11 +472,7 @@ class ConfigManager(ProxyBase):
         doc.add(comment("=" * 80))
         c = item({})
         c.add(nl())
-        c.add(
-            comment(
-                '每次进行进行 Subsonic 保活的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):'
-            )
-        )
+        c.add(comment('每次进行进行 Subsonic 保活的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):'))
         c["time_range"] = default_config.subsonic.time_range
         c.add(nl())
         c.add(comment("每隔几天进行 Subsonic 保活:"))
@@ -613,9 +595,7 @@ class ConfigManager(ProxyBase):
                     with open(default_conf_file, "w+", encoding="utf-8") as f:
                         f.write(self.generate_example_config())
                 except OSError as e:
-                    logger.error(
-                        f'无法写入默认配置文件 "{default_conf_file}", 请确认是否有权限进行该目录写入: {e}.'
-                    )
+                    logger.error(f'无法写入默认配置文件 "{default_conf_file}", 请确认是否有权限进行该目录写入: {e}.')
                     return False
                 logger.warning("需要一个 TOML 格式的配置文件.")
                 logger.warning(f'您可以根据生成的参考配置文件 "{default_conf_file}" 进行配置')

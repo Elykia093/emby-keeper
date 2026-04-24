@@ -11,9 +11,7 @@ class TemplateBMessagerConfig(BaseModel):
     name: str = None
     chat_name: Union[str, int] = None  # 发送群聊名称
     style_messages: List[str] = None  # 使用的风格语料, 与 style_message_list 二选一
-    style_message_list: str = (
-        None  # 使用的风格语料列表, 例如 "some-wl@v1.yaml", 放置在 basedir 中, 且 @v1.yaml 尾缀是必须的
-    )
+    style_message_list: str = None  # 使用的风格语料列表, 例如 "some-wl@v1.yaml", 放置在 basedir 中, 且 @v1.yaml 尾缀是必须的
     min_interval: int = None  # 发送最小间隔 (秒)
     max_interval: int = None  # 发送最大间隔 (秒)
     at: Optional[List[str]] = None  # 时间区间, 例如 ["5:00AM", "9:00PM"]

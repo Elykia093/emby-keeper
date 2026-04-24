@@ -114,9 +114,7 @@ class WokeMonitor(Monitor):
                 else:
                     await asyncio.sleep(random.uniform(3, 5))
                     self.log.info("已成功验证, 继续进行注册流程.")
-                async with self.client.catch_reply(
-                    self.bot_username, filter=~filters.regex("请耐心等待")
-                ) as f:
+                async with self.client.catch_reply(self.bot_username, filter=~filters.regex("请耐心等待")) as f:
                     try:
                         msg = await msg_start.click("创建账户", timeout=1)
                     except (TimeoutError, MessageIdInvalid):

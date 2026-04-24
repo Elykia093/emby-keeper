@@ -16,6 +16,4 @@ class EmbyhubMonitor(Monitor):
 
     async def on_trigger(self, message: Message, key, reply):
         await self.client.send_message(self.bot_username, f"/create {self.unique_name}")
-        self.log.bind(msg=True).info(
-            f'已向 Bot @{self.bot_username} 发送了用户注册申请: "{self.unique_name}", 请检查结果.'
-        )
+        self.log.bind(msg=True).info(f'已向 Bot @{self.bot_username} 发送了用户注册申请: "{self.unique_name}", 请检查结果.')

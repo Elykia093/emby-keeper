@@ -120,9 +120,7 @@ class PornfansAlertMonitor(Monitor):
                         await asyncio.sleep(random.uniform(5, 15))
                         await message.reply(random.choice(self.reply_words))
                         self.last_reply = datetime.now()
-                        self.log.bind(msg=True).warning(
-                            "PornFans 群中有人回复了您的自动水群消息, 已回复, 请查看."
-                        )
+                        self.log.bind(msg=True).warning("PornFans 群中有人回复了您的自动水群消息, 已回复, 请查看.")
             return
 
         # 管理员 @ 当前用户, 永久停止
@@ -136,9 +134,7 @@ class PornfansAlertMonitor(Monitor):
                 ):
                     if await self.check_admin(message.chat, message.from_user):
                         await self.set_alert(reason="管理员 @ 了当前用户")
-                        self.log.bind(msg=True).warning(
-                            "PornFans 管理员回复了您的自动水群消息, 已急停, 请查看."
-                        )
+                        self.log.bind(msg=True).warning("PornFans 管理员回复了您的自动水群消息, 已急停, 请查看.")
                     else:
                         await self.set_alert(3600, reason="非管理员 @ 了当前用户")
                     return
