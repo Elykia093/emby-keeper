@@ -1,4 +1,4 @@
-name: Docker Image Publish
+﻿name: Docker Image Publish
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     types: [released]
 
 env:
-  REGISTRY_IMAGE: embykeeper/embykeeper
+  REGISTRY_IMAGE: elykia093/emby-keeper
   HF_SPACE_REPO: ekuser/ek
 
 permissions:
@@ -110,32 +110,32 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
-  sync-to-hf:
-    runs-on: ubuntu-latest
-    needs:
-      - merge
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Push to Hugging Face
-        run: |
-          sleep 30
-          cd hf
-          git config --global init.defaultBranch main
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git init
-          git remote add origin https://${{ secrets.HF_USERNAME }}:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/${{ env.HF_SPACE_REPO }}
-          git add .
-          git commit -m "Update for version ${{ github.ref_name }}"
-          git pull origin main --rebase -Xtheirs
-          git push origin main
-        env:
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+#   sync-to-hf:
+#     runs-on: ubuntu-latest
+#     needs:
+#       - merge
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#
+#       - name: Set up Python
+#         uses: actions/setup-python@v4
+#         with:
+#           python-version: '3.x'
+#
+#       - name: Push to Hugging Face
+#         run: |
+#           sleep 30
+#           cd hf
+#           git config --global init.defaultBranch main
+#           git config --global user.name "github-actions"
+#           git config --global user.email "github-actions@github.com"
+#           git init
+#           git remote add origin https://${{ secrets.HF_USERNAME }}:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/${{ env.HF_SPACE_REPO }}
+#           git add .
+#           git commit -m "Update for version ${{ github.ref_name }}"
+#           git pull origin main --rebase -Xtheirs
+#           git push origin main
+#         env:
+#           HF_USERNAME: ${{ secrets.HF_USERNAME }}
+#           HF_TOKEN: ${{ secrets.HF_TOKEN }}
