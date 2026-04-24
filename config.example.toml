@@ -218,6 +218,8 @@ once = false
 method = "telegram"
 # Apprise 推送地址, 仅当 method = "apprise" 时有效
 apprise_uri = ""
+# Telegram Bot API 反代地址, 仅当 method = "apprise" 且 apprise_uri 使用 tgram:// 时有效, 未设置则使用官方 API
+telegram_api_url = ""
 
 # ================================================================================
 # Subsonic 保活相关设置 (包括 Navidrome 和其他支持 Subsonic API 的音乐服站点)

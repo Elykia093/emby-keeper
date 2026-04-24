@@ -463,6 +463,12 @@ class ConfigManager(ProxyBase):
         c["method"] = "telegram"
         c.add(comment('Apprise 推送地址, 仅当 method = "apprise" 时有效'))
         c["apprise_uri"] = ""
+        c.add(
+            comment(
+                'Telegram Bot API 反代地址, 仅当 method = "apprise" 且 apprise_uri 使用 tgram:// 时有效, 未设置则使用官方 API'
+            )
+        )
+        c["telegram_api_url"] = ""
         doc["notifier"] = c
         doc.add(nl())
 

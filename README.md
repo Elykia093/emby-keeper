@@ -9,6 +9,7 @@
 - EPub 群组每日默认发言数从 5 条调整为 2 条，Peach 已签到 callback 超时降为 debug 日志。
 - Docker 镜像发布命名空间调整为 `elykia093/emby-keeper`，正式镜像不再同步 Hugging Face，开发镜像不再由 `main` 分支 push 自动触发。
 - 示例配置增加 `[checkiner.ai]`，并在站点列表中补充 `mooncake_ai`。
+- Apprise 新增可选 `telegram_api_url` 配置，`tgram://` 推送在 Hugging Face 等环境下可切换走 Telegram Bot API 反代，未设置时仍使用官方 API。
 
 [![build status](https://img.shields.io/github/actions/workflow/status/emby-keeper/emby-keeper/ci.yml?branch=main)](https://github.com/emby-keeper/emby-keeper/commits/main) [![pypi badge](https://img.shields.io/pypi/v/embykeeper)](https://pypi.org/project/embykeeper/) [![docker](https://img.shields.io/docker/v/embykeeper/embykeeper?label=docker)](https://hub.docker.com/r/embykeeper/embykeeper) [![docker pulls](https://img.shields.io/docker/pulls/embykeeper/embykeeper?label=pulls)](https://hub.docker.com/r/embykeeper/embykeeper) [![license badge](https://img.shields.io/github/license/emby-keeper/emby-keeper)](https://github.com/emby-keeper/emby-keeper/blob/main/LICENSE) [![telegram badge](https://img.shields.io/badge/telegram-bot-blue)](https://t.me/embykeeper_bot) [![telegram badge](https://img.shields.io/badge/telegram-channel-green)](https://t.me/embykeeper) [![telegram badge](https://img.shields.io/badge/telegram-group-violet)](https://t.me/embykeeperchat)
 
@@ -313,3 +314,4 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
 ##### 通过[爱发电](https://afdian.com/a/jackzzs)赞助
 
 ![Kitty](https://github.com/emby-keeper/emby-keeper/raw/main/images/kitty.gif)
+- Apprise add optional 	elegram_api_url; 	gram:// can use Telegram Bot API proxy on Hugging Face-like environments, and falls back to official API when unset.

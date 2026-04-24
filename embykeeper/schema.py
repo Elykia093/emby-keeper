@@ -102,6 +102,7 @@ class NotifierConfig(ConfigModel):
     once: Optional[bool] = False
     method: Optional[str] = "telegram"
     apprise_uri: Optional[str] = None
+    telegram_api_url: Optional[UseHttpUrl] = None
 
 
 class SiteConfig(ConfigModel):
