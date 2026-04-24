@@ -20,8 +20,6 @@ from embykeeper.config import config
 from embykeeper.runinfo import RunContext, RunStatus
 
 from ..pyrogram import Client
-from ..link import Link
-
 __ignore__ = True
 
 
@@ -247,9 +245,8 @@ class Monitor:
         self.chat_name = [chat.id for chat in chats]
 
         if self.additional_auth:
-            for a in self.additional_auth:
-                if not await Link(self.client).auth(a, log_func=self.log.info):
-                    return self.ctx.finish(RunStatus.IGNORE, "需要额外认证")
+            auth_names = ", ".join(a.upper() for a in self.additional_auth)
+            self.log.info(f"Auth Bot 不可用，已跳过监控站点附加认证：{auth_names}。")
 
         if not self.init_first:
             if not await self.init():

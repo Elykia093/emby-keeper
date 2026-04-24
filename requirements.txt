@@ -13,6 +13,7 @@ kurigram==2.2.12
 tgcrypto
 pillow>10.0.0
 thefuzz[speedup]
+zai-sdk==0.2.2
 aiocache
 flask==3.0.3
 flask-socketio==5.3.6

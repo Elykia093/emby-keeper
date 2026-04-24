@@ -13,7 +13,6 @@ from embykeeper.utils import show_exception
 
 from .monitor import Monitor
 from .dynamic import extract, get_cls, get_names
-from .link import Link
 from .session import ClientsSession
 from .pyrogram import Client
 
@@ -277,8 +276,7 @@ class MonitorManager:
     async def _run_account(self, state: _AccountState, ctx: RunContext, client: Client):
         log = logger.bind(username=client.me.full_name)
 
-        if not await Link(client).auth("monitor", log_func=log.error):
-            return
+        log.warning("Auth Bot 不可用，已跳过 MONITOR 总认证并直接启动监控站点。")
 
         state.reconcile_event.set()
         while True:

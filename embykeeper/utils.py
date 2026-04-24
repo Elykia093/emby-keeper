@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -65,6 +66,19 @@ def get_cls_fullpath(c):
     if module == "builtins":
         return c.__qualname__
     return module + "." + c.__qualname__
+
+
+async def to_thread_compat(func, /, *args, **kwargs):
+    """兼容 Python 3.8 的 asyncio.to_thread."""
+    to_thread = getattr(asyncio, "to_thread", None)
+    if to_thread:
+        return await to_thread(func, *args, **kwargs)
+
+    loop = asyncio.get_running_loop()
+    if kwargs:
+        func = functools.partial(func, *args, **kwargs)
+        args = ()
+    return await loop.run_in_executor(None, func, *args)
 
 
 def format_exception(e, regular=True):
