@@ -15,7 +15,6 @@ from embykeeper.utils import AsyncTaskPool, show_exception
 
 from .checkiner import BaseBotCheckin
 from .dynamic import extract, get_cls, get_names
-from .link import Link
 from .session import ClientsSession
 from .pyrogram import Client
 
@@ -303,8 +302,7 @@ class CheckinerManager:
                 log.warning("没有任何有效签到站点, 签到将跳过.")
             return
 
-        if not await Link(client).auth("checkiner", log_func=log.error):
-            return
+        log.warning("Auth Bot 不可用，已跳过 CHECKINER 总认证并直接启动签到站点。")
 
         config_to_use = account.checkiner_config or config.checkiner
         sem = asyncio.Semaphore(config_to_use.concurrency)
@@ -377,11 +375,21 @@ class CheckinerManager:
         if ignored:
             spec += f", {len(ignored)}跳过"
 
+        details = []
+        if checked:
+            details.append(f"已签到而跳过: {', '.join(checked)}")
+        if failed:
+            details.append(f"失败: {', '.join(failed)}")
+        if ignored:
+            details.append(f"跳过: {', '.join(ignored)}")
+
         if failed:
             msg = "签到部分失败" if successful else "签到失败"
-            log.bind(log=True).error(f"{msg} ({spec}): {', '.join(failed)}")
+            suffix = f": {'; '.join(details)}" if details else ""
+            log.bind(log=True).error(f"{msg} ({spec}){suffix}")
         else:
-            log.bind(log=True).info(f"签到成功 ({spec}).")
+            suffix = f": {'; '.join(details)}" if details else "."
+            log.bind(log=True).info(f"签到成功 ({spec}){suffix}")
 
     def new_ctx(self):
         now = datetime.now()

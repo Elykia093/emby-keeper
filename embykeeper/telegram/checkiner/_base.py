@@ -60,7 +60,7 @@ default_keywords = {
         "你有号吗",
     ),
     "too_many_tries_fail": ("已尝试", "过多"),
-    "checked": ("只能", "已经", "过了", "签过", "明日再来", "重复签到"),
+    "checked": ("只能", "已经", "过了", "签过", "明日再来", "重复签到", "已签到", "今日已签到"),
     "fail": ("失败", "错误", "超时"),
     "success": ("成功", "通过", "完成", "获得"),
 }
@@ -284,9 +284,8 @@ class BotCheckin(BaseBotCheckin):
 
         while True:
             if self.additional_auth:
-                for a in self.additional_auth:
-                    if not await Link(self.client).auth(a, log_func=self.log.info):
-                        return self.ctx.finish(RunStatus.IGNORE, "需要额外认证")
+                auth_names = ", ".join(a.upper() for a in self.additional_auth)
+                self.log.info(f"Auth Bot 不可用，已跳过签到站点附加认证：{auth_names}。")
 
             if not self.init_first:
                 if not await self.init():
