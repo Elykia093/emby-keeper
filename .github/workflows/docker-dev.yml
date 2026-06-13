@@ -2,6 +2,11 @@
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Optional Docker tag to publish when running manually
+        required: false
+        default: v7.6.2
   release:
     types: [released]
 
@@ -41,6 +46,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=ref,event=pr
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
           flavor: |
             latest=false
             suffix=-dev
@@ -108,6 +114,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=ref,event=pr
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
           flavor: |
             latest=false
             suffix=-dev

@@ -2,12 +2,20 @@ name: Update Stable Branch
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to promote to stable
+        required: true
+        default: v7.6.2
   release:
     types: [released]
 
 permissions:
   contents: write
   actions: write
+
+env:
+  TARGET_REF: ${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}
 
 jobs:
   update-stable:
@@ -25,7 +33,7 @@ jobs:
         else
           git checkout stable
         fi
-        git reset --hard ${GITHUB_REF#refs/tags/}
+        git reset --hard "${TARGET_REF}"
         git push origin stable --force
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

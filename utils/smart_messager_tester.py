@@ -17,7 +17,6 @@ from embykeeper.telegram.session import ClientsSession
 from embykeeper.cli import AsyncTyper, get_proxy_str, truncate_str
 from embykeeper.config import config
 
-
 app = AsyncTyper()
 
 # 定义历史消息数量常量
@@ -56,7 +55,9 @@ async def main(config_file: Path):
                             spec.append("包含一张照片")
                         if msg.reply_to_message_id:
                             rmsg = await tg.get_messages(msg.chat.id, msg.reply_to_message_id)
-                            spec.append(f"回复了消息: {truncate_str(str(rmsg.caption or rmsg.text or ''), 60)}")
+                            spec.append(
+                                f"回复了消息: {truncate_str(str(rmsg.caption or rmsg.text or ''), 60)}"
+                            )
                         spec = " ".join(spec)
                         ctx = truncate_str(text, 180)
                         if msg.from_user and msg.from_user.full_name:

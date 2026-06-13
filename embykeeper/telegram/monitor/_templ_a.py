@@ -31,7 +31,9 @@ class TemplateAMonitorConfig(BaseModel):
     allow_text: bool = True  # 是否允许不带照片的消息
     send: bool = True  # 是否发送通知
     send_immediately: bool = True  # 是否发送即时日志, 不等待每日推送时间
-    try_register_bot: Optional[str] = None  # 尝试注册的机器人名称 (需为: https://github.com/berry8838/Sakura_embyboss)
+    try_register_bot: Optional[str] = (
+        None  # 尝试注册的机器人名称 (需为: https://github.com/berry8838/Sakura_embyboss)
+    )
 
 
 class TemplateAMonitor(Monitor):

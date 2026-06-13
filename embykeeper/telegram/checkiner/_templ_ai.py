@@ -49,7 +49,9 @@ class TemplateAICheckin(TemplateACheckin):
     model_id = "glm-4.1v-thinking-flashx"
     llm_timeout = 60
     llm_button_match_threshold = 70
-    llm_prompt = "你在帮助 Telegram 签到。请根据图片中的验证码、图案、文字或题目，" "从候选按钮中选择唯一正确答案。"
+    llm_prompt = (
+        "你在帮助 Telegram 签到。请根据图片中的验证码、图案、文字或题目，" "从候选按钮中选择唯一正确答案。"
+    )
 
     _zhipu_client = None
     _zhipu_api_key = None
@@ -281,7 +283,9 @@ class TemplateAICheckin(TemplateACheckin):
     def get_zhipu_client(self):
         api_key = self.api_key
         if not api_key:
-            self.log.warning("签到失败: 未设置智谱 API Key, 请在 `config.toml` 中配置 `[checkiner.ai].api_key`.")
+            self.log.warning(
+                "签到失败: 未设置智谱 API Key, 请在 `config.toml` 中配置 `[checkiner.ai].api_key`."
+            )
             return None
 
         if (

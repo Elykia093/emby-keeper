@@ -17,7 +17,6 @@ from embykeeper.utils import AsyncTaskPool
 
 from .api import Emby, EmbyPlayError, EmbyConnectError, EmbyRequestError, EmbyError
 
-
 logger = logger.bind(scheme="embywatcher")
 
 
@@ -245,7 +244,7 @@ class EmbyManager:
             async with sem:
                 try:
                     emby = Emby(account)
-                except Exception:
+                except Exception as e:
                     logger.error(f"初始化失败: {e}")
                     show_exception(e, regular=False)
                     return account, False
@@ -313,7 +312,9 @@ class EmbyManager:
         if len(accounts) == 1:
             logger.bind(log=True).info(f"保活成功: {', '.join(successful_accounts)}.")
         else:
-            logger.bind(log=True).info(f"保活成功 ({len(tasks)}/{len(tasks)}): {', '.join(successful_accounts)}.")
+            logger.bind(log=True).info(
+                f"保活成功 ({len(tasks)}/{len(tasks)}): {', '.join(successful_accounts)}."
+            )
         return ctx.finish(RunStatus.SUCCESS, f"保活成功")
 
     async def run_all(self, instant: bool = False):

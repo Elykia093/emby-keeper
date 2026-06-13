@@ -2,12 +2,18 @@ name: Windows Release Build
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to upload assets to
+        required: true
+        default: v7.6.2
   release:
     types: [released]
 
 env:
-  WIN_SCRIPT_ZIP_NAME: 'embykeeper-win-${{ github.ref_name }}.zip'
-  WIN_GUI_EXE_NAME: 'embykeeper-win-${{ github.ref_name }}.exe'
+  RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}
+  WIN_SCRIPT_ZIP_NAME: 'embykeeper-win-${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}.zip'
+  WIN_GUI_EXE_NAME: 'embykeeper-win-${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}.exe'
 
 permissions:
   contents: write
@@ -36,7 +42,7 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
-          gh release upload ${{ github.ref_name }} windows/installer-script/${{ env.WIN_SCRIPT_ZIP_NAME }} --repo ${{ github.repository }}
+          gh release upload "${RELEASE_TAG}" "windows/installer-script/${WIN_SCRIPT_ZIP_NAME}" --repo "${{ github.repository }}" --clobber
 
   win-gui:
     runs-on: windows-latest
@@ -62,4 +68,4 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
-          gh release upload ${{ github.ref_name }} ${{ env.WIN_GUI_EXE_NAME }} --repo ${{ github.repository }}
+          gh release upload "${RELEASE_TAG}" "${WIN_GUI_EXE_NAME}" --repo "${{ github.repository }}" --clobber
