@@ -42,7 +42,7 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
-          gh release upload "${RELEASE_TAG}" "windows/installer-script/${WIN_SCRIPT_ZIP_NAME}" --repo "${{ github.repository }}" --clobber
+          gh release upload "${{ env.RELEASE_TAG }}" "windows/installer-script/${{ env.WIN_SCRIPT_ZIP_NAME }}" --repo "${{ github.repository }}" --clobber
 
   win-gui:
     runs-on: windows-latest
@@ -72,4 +72,4 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
-          gh release upload "${RELEASE_TAG}" "${WIN_GUI_EXE_NAME}" --repo "${{ github.repository }}" --clobber
+          gh release upload "${{ env.RELEASE_TAG }}" "${{ env.WIN_GUI_EXE_NAME }}" --repo "${{ github.repository }}" --clobber
