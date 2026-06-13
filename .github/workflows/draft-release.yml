@@ -2,12 +2,20 @@ name: Create Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create or update
+        required: true
+        default: v7.6.2
   push:
     tags:
       - 'v*'
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   draft:
@@ -19,5 +27,8 @@ jobs:
         uses: ncipollo/release-action@v1.14.0
         with:
           draft: true
+          allowUpdates: true
+          tag: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           token: ${{ secrets.GITHUB_TOKEN }}
           bodyFile: '.github/RELEASE_BODY.md'

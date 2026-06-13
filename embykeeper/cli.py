@@ -437,6 +437,10 @@ async def main(
         messager = True
         registrar = True
 
+    config.on_change(
+        "proxy", lambda x, y: logger.bind(scheme="config").warning("修改代理设置后, 可能需要重启程序以生效.")
+    )
+
     if config.mongodb and not var.use_mongodb_config:
         if config.proxy:
             logger.warning("由于不支持, 不使用设定的代理连接 MongoDB 服务器.")
