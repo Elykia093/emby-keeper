@@ -67,4 +67,5 @@ jobs:
           gh release upload "${RELEASE_TAG}" dist/* --repo "${{ github.repository }}" --clobber
       -
         name: Publish to Pypi
+        if: github.repository == 'emby-keeper/emby-keeper'
         uses: pypa/gh-action-pypi-publish@release/v1
