@@ -10,8 +10,7 @@ from pyrogram import filters
 from pyrogram.raw.functions.messages import RequestWebView
 from pyrogram.errors import MessageIdInvalid
 
-from embykeeper.config import config
-from embykeeper.utils import get_proxy_str
+from .. import get_telegram_proxy_str
 
 from ..link import Link
 from . import Monitor
@@ -50,7 +49,7 @@ class WokeMonitor(Monitor):
                 "cf-turnstile-response": token,
             }
             try:
-                async with httpx.AsyncClient(http2=True, proxy=get_proxy_str(config.proxy)) as client:
+                async with httpx.AsyncClient(http2=True, proxy=get_telegram_proxy_str()) as client:
                     resp = await client.post(url_submit, headers=headers, data=data)
                     result = resp.text
                     if "完成" in result:

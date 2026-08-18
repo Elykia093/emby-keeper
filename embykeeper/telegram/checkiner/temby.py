@@ -10,8 +10,7 @@ from pyrogram.raw.types.messages import BotApp as MessageBotApp
 from faker import Faker
 import httpx
 
-from embykeeper.utils import get_proxy_str
-from embykeeper.config import config
+from .. import get_telegram_proxy_str
 
 from ..link import Link
 from . import BotCheckin
@@ -83,7 +82,7 @@ class TembyCheckin(BotCheckin):
                 "cf-turnstile-response": token,
             }
             try:
-                async with httpx.AsyncClient(http2=True, proxy=get_proxy_str(config.proxy)) as client:
+                async with httpx.AsyncClient(http2=True, proxy=get_telegram_proxy_str()) as client:
                     resp = await client.get(url_submit, headers=headers, params=params)
                     result = resp.text
                     if "好像还没有通过验证" in result:

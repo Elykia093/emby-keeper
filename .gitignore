@@ -10,6 +10,7 @@
 *.session-journal
 *.msgs.yaml
 *.updates.json
+cache.json
 emby_user_device.csv
 
 # Test files

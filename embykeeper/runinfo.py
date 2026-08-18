@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from asyncio import Event
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import IntEnum, auto
-from typing import TYPE_CHECKING, Callable, Dict, List
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 import random
 import string
 from loguru import logger
 
 from rich.text import Text
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr
 
 from .utils import to_iterable
 from .cache import cache
@@ -19,6 +19,18 @@ if TYPE_CHECKING:
     from loguru import Logger
 
 _running_runs: Dict[str, RunContext] = {}
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _normalize_datetime(value: Optional[datetime]) -> datetime:
+    if value is None:
+        return _now()
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 class RunStatus(IntEnum):
@@ -49,20 +61,20 @@ class RunContext(BaseModel):
     _handler_id: int = PrivateAttr(default=None)
 
     id: str
-    parent_ids: List[str] = []
-    description: str = None
+    parent_ids: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
     status: RunStatus = RunStatus.PENDING
-    status_info: str = None
-    log: List[LogRecord] = []
-    duration: float = None
-    start_time: datetime = None
-    end_time: datetime = None
-    next_time: datetime = None
-    reschedule: int = None
+    status_info: Optional[str] = None
+    log: List[LogRecord] = Field(default_factory=list)
+    duration: Optional[float] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    next_time: Optional[datetime] = None
+    reschedule: Optional[int] = None
 
     def start(self, status: RunStatus = RunStatus.RUNNING):
         """开始任务, 设置开始时间和状态"""
-        self.start_time = datetime.now()
+        self.start_time = _now()
         self.set(status)
         self._started.set()
 
@@ -71,9 +83,6 @@ class RunContext(BaseModel):
 
         if status:
             self.status = status
-            self.log.append(
-                LogRecord(level="DEBUG", message=f"任务状态已设置为 {status.name}", time=datetime.now())
-            )
 
     def finish(self, status: RunStatus = None, status_info: str = None):
         """完成任务, 记录状态和时间, 并保存到缓存"""
@@ -82,7 +91,7 @@ class RunContext(BaseModel):
         self.set(status)
         if status_info:
             self.status_info = status_info
-        self.end_time = datetime.now()
+        self.end_time = _now()
 
         # 计算持续时间
         if self.start_time:
@@ -172,6 +181,30 @@ class RunContext(BaseModel):
             return cls.model_validate_json(run_json)
         return None
 
+    @classmethod
+    def list_all(cls) -> List["RunContext"]:
+        contexts: List[RunContext] = []
+        seen_ids = set()
+
+        for run_id, ctx in _running_runs.items():
+            contexts.append(ctx)
+            seen_ids.add(run_id)
+
+        for key in cache.find_by_prefix("runinfo."):
+            if key.startswith("runinfo.children."):
+                continue
+
+            run_id = key.replace("runinfo.", "")
+            if run_id in seen_ids:
+                continue
+
+            ctx = cls.get(run_id)
+            if ctx:
+                contexts.append(ctx)
+                seen_ids.add(run_id)
+
+        return contexts
+
     def get_parents(self):
         """获取所有父任务"""
         parents = []
@@ -202,10 +235,12 @@ class RunContext(BaseModel):
         # 确保所有日志都有时间戳
         for log in logs:
             if log.time is None:
-                log.time = datetime.now()
+                log.time = _now()
+            else:
+                log.time = _normalize_datetime(log.time)
 
         # 按时间排序
-        logs.sort(key=lambda x: x.time, reverse=reverse)
+        logs.sort(key=lambda x: _normalize_datetime(x.time), reverse=reverse)
         yield from logs
 
     def log_sink(self, message):
@@ -214,7 +249,7 @@ class RunContext(BaseModel):
             log_record = LogRecord(
                 level=record["level"].name.upper(),
                 message=Text(record["message"]).plain,
-                time=record["time"],
+                time=_normalize_datetime(record["time"]),
             )
             self.log.append(log_record)
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "embykeeper"
-version = "7.6.2"
+version = "7.6.3"
 authors = [
     {name = "jackzzs", email = "jackzzs@outlook.com"},
 ]
@@ -26,14 +26,9 @@ classifiers = [
     "Natural Language :: Chinese (Simplified)",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.12,<3.13"
 dynamic = ["dependencies"]
 
 [project.urls]
@@ -46,6 +41,7 @@ content-type = "text/markdown"
 [project.scripts]
 embykeeper = "embykeeper.cli:app"
 embykeeperweb = "embykeeperweb.app:cli"
+embykeeperapi = "embykeeperapi.app:cli"
 
 [tool.setuptools]
 zip-safe = false

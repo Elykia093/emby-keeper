@@ -61,6 +61,7 @@ class ProxyConfig(ConfigModel):
 
 
 class CheckinerConfig(ConfigModel):
+    enabled: Optional[bool] = True
     time_range: Optional[UseStr] = DEFAULT_TIME_RANGE
     interval_days: Optional[UseStr] = "1"
     timeout: Optional[int] = 120
@@ -75,6 +76,8 @@ class CheckinerConfig(ConfigModel):
 
 
 class MonitorConfig(ConfigModel):
+    enabled: Optional[bool] = True
+
     model_config = {"extra": "allow"}
 
     def get_site_config(self, site: str) -> Dict[str, Any]:
@@ -82,6 +85,8 @@ class MonitorConfig(ConfigModel):
 
 
 class MessagerConfig(ConfigModel):
+    enabled: Optional[bool] = True
+
     model_config = {"extra": "allow"}
 
     def get_site_config(self, site: str) -> Dict[str, Any]:
@@ -89,6 +94,7 @@ class MessagerConfig(ConfigModel):
 
 
 class RegistrarConfig(ConfigModel):
+    enabled: Optional[bool] = True
     concurrency: Optional[int] = 1
 
     model_config = {"extra": "allow"}
@@ -115,6 +121,7 @@ class SiteConfig(ConfigModel):
 
 
 class MediaServerBaseConfig(ConfigModel):
+    enabled: Optional[bool] = True
     time_range: Optional[UseStr] = DEFAULT_TIME_RANGE
     interval_days: Optional[UseStr] = DEFAULT_EMBY_INTERVAL_DAYS
     concurrency: Optional[int] = 1
@@ -122,6 +129,7 @@ class MediaServerBaseConfig(ConfigModel):
 
 
 class EmbyAccount(ConfigModel):
+    id: Optional[str] = None
     url: UseHttpUrl
     username: str
     password: str
@@ -157,6 +165,7 @@ class EmbyConfig(MediaServerBaseConfig):
 
 
 class SubsonicAccount(ConfigModel):
+    id: Optional[str] = None
     url: UseHttpUrl
     username: str
     password: str
@@ -228,6 +237,16 @@ class BotConfig(ConfigModel):
     token: str
 
 
+class TurnstileConfig(ConfigModel):
+    """Cloudflare Turnstile 本地求解配置 (月饼 embyguard 等)."""
+
+    # 自建 turnsolve 地址; 支持逗号分隔多个, 失败自动换下一个
+    # 例: "http://127.0.0.1:8889,http://10.0.0.2:8889"
+    solver_url: Optional[str] = None
+    # YesCaptcha API Key; 设置后优先走 YesCaptcha, 不再请求 solver_url
+    yescaptcha_key: Optional[str] = None
+
+
 class Config(ConfigModel):
     alias_map: ClassVar[Dict[str, str]] = {
         "emby.time_range": "watchtime",
@@ -259,6 +278,7 @@ class Config(ConfigModel):
     telegram: Optional[TelegramConfig] = TelegramConfig()
     notifier: Optional[NotifierConfig] = NotifierConfig()
     site: Optional[SiteConfig] = None
+    turnstile: Optional[TurnstileConfig] = None
 
     # 向后兼容字段
     time: Optional[str] = None

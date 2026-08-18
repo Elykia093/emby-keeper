@@ -7,9 +7,9 @@ from pyrogram.raw.functions.messages import RequestWebView
 from pyrogram.raw.functions.users import GetFullUser
 
 from embykeeper.runinfo import RunStatus
-from embykeeper.utils import format_timedelta_human, get_proxy_str, show_exception
-from embykeeper.config import config
+from embykeeper.utils import format_timedelta_human, show_exception
 
+from .. import get_telegram_proxy_str
 from . import BotCheckin
 
 
@@ -39,7 +39,7 @@ class NebulaCheckin(BotCheckin):
 
         try:
             async with AsyncSession(
-                proxy=get_proxy_str(config.proxy, curl=True),
+                proxy=get_telegram_proxy_str(curl=True),
                 headers=headers,
                 impersonate="edge",
                 allow_redirects=True,

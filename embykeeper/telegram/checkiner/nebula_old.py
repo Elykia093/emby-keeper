@@ -8,9 +8,9 @@ from pyrogram.raw.functions.users import GetFullUser
 from faker import Faker
 
 from embykeeper.runinfo import RunStatus
-from embykeeper.utils import remove_prefix, get_proxy_str, show_exception
-from embykeeper.config import config
+from embykeeper.utils import remove_prefix, show_exception
 
+from .. import get_telegram_proxy_str
 from ..link import Link
 from . import BotCheckin
 
@@ -43,7 +43,7 @@ class NebulaCheckin(BotCheckin):
         useragent = Faker().safari()
         query["token"] = token
         url_checkin = scheme._replace(query=urlencode(query, True)).geturl()
-        proxy = get_proxy_str(config.proxy)
+        proxy = get_telegram_proxy_str()
         try:
             async with httpx.AsyncClient(http2=True, proxy=proxy) as client:
                 resp = await client.get(url_checkin, headers={"User-Agent": useragent})

@@ -1,6 +1,6 @@
 # A script to download and install dependencies listed in a requirements file from pip
 # Usage: .\download_deps.ps1 [-RequirementsFile <RequirementsFile>] [-PipPath <PipPath>]
-# Example: .\download_deps.ps1 requirements.txt C:\Python\3.8.0\Scripts\pip.exe
+# Example: .\download_deps.ps1 requirements.txt C:\Python\3.12.10\Scripts\pip.exe
 
 param(
     [Parameter()]

@@ -12,8 +12,18 @@
 - Apprise 新增可选 `telegram_api_url` 配置，`tgram://` 推送在 Hugging Face 等环境下可切换走 Telegram Bot API 反代，未设置时仍使用官方 API。
 - 借鉴 `aprpure/emby-keeper` 的 Emby 播放收口逻辑，稳定 `PlaybackStartTimeTicks`，使用真实 Emby `UserId`，播放结束改为 `/Sessions/Playing/Stopped`，并不再把播放数未即时递增视为失败。
 - 新增 Emby 保活回归测试，覆盖仅登录不播放、播放时长封顶、无媒体源报错、播放停止上报和初始化异常处理。
+- 新增 Vue 3 Web 管理面板，提供运行概览、系统日志、Telegram / Emby / Subsonic 账号、任务记录和系统设置页面。
+- 新增内嵌 FastAPI 业务接口，覆盖认证、配置、系统状态、运行记录以及 Telegram、Emby、Subsonic 管理。
+- 新增独立面板 API 服务，支持登录鉴权、后端进程管理、SSE 日志、状态存储和业务 API 反向代理。
+- 重构运行时任务管理，账号、站点、执行时间和并发配置发生变化时，可动态调整 Telegram、Emby 与 Subsonic 任务。
+- 新增 Kotomi 与 Mambo 网页签到器，支持网页登录 / API 签到、已签到状态判断和安全验证拦截处理，并补充对应回归测试。
+- 新增通用 Cloudflare Turnstile 求解服务，支持多组 turnsolve 地址自动切换与 YesCaptcha，并接入月饼 WebApp 签到流程。
+- 完善运行时代理配置热更新，`proxy` 或 `telegram.use_proxy` 变化时，仅重启实际受影响的 Telegram、Emby 与 Subsonic 模块。
+- 更新 v7.6.3 发布流程，修复手动发布时的 Windows 制品上传，补充 NSIS 安装，并限制 PyPI 发布仅在上游仓库执行。
+- 相比 v7.6.2，运行与构建环境统一升级到 Python 3.12：Docker 使用 3.12.14，Windows 安装器使用 3.12.10，CI / tox 使用 Python 3.12。
+- 智谱 AI 依赖由固定 `zai-sdk==0.2.2` 调整为 `zai-sdk>=0.2.2`，并补充 Turnstile HTTP 客户端依赖。
 
-[![build status](https://img.shields.io/github/actions/workflow/status/emby-keeper/emby-keeper/ci.yml?branch=main)](https://github.com/emby-keeper/emby-keeper/commits/main) [![pypi badge](https://img.shields.io/pypi/v/embykeeper)](https://pypi.org/project/embykeeper/) [![docker](https://img.shields.io/docker/v/embykeeper/embykeeper?label=docker)](https://hub.docker.com/r/embykeeper/embykeeper) [![docker pulls](https://img.shields.io/docker/pulls/embykeeper/embykeeper?label=pulls)](https://hub.docker.com/r/embykeeper/embykeeper) [![license badge](https://img.shields.io/github/license/emby-keeper/emby-keeper)](https://github.com/emby-keeper/emby-keeper/blob/main/LICENSE) [![telegram badge](https://img.shields.io/badge/telegram-bot-blue)](https://t.me/embykeeper_bot) [![telegram badge](https://img.shields.io/badge/telegram-channel-green)](https://t.me/embykeeper) [![telegram badge](https://img.shields.io/badge/telegram-group-violet)](https://t.me/embykeeperchat)
+[![build status](https://img.shields.io/github/actions/workflow/status/emby-keeper/emby-keeper/ci.yml?branch=main)](https://github.com/emby-keeper/emby-keeper/commits/main) [![pypi badge](https://img.shields.io/pypi/v/embykeeper)](https://pypi.org/project/embykeeper/) [![docker](https://img.shields.io/docker/v/elykia093/emby-keeper?label=docker)](https://hub.docker.com/r/elykia093/emby-keeper) [![docker pulls](https://img.shields.io/docker/pulls/elykia093/emby-keeper?label=pulls)](https://hub.docker.com/r/elykia093/emby-keeper) [![license badge](https://img.shields.io/github/license/emby-keeper/emby-keeper)](https://github.com/emby-keeper/emby-keeper/blob/main/LICENSE) [![telegram badge](https://img.shields.io/badge/telegram-bot-blue)](https://t.me/embykeeper_bot) [![telegram badge](https://img.shields.io/badge/telegram-channel-green)](https://t.me/embykeeper) [![telegram badge](https://img.shields.io/badge/telegram-group-violet)](https://t.me/embykeeperchat)
 
 <p align="center">
   <a href='https://github.com/emby-keeper/emby-keeper'>
@@ -316,4 +326,3 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
 ##### 通过[爱发电](https://afdian.com/a/jackzzs)赞助
 
 ![Kitty](https://github.com/emby-keeper/emby-keeper/raw/main/images/kitty.gif)
-- Apprise add optional 	elegram_api_url; 	gram:// can use Telegram Bot API proxy on Hugging Face-like environments, and falls back to official API when unset.

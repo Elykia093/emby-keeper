@@ -1,4 +1,4 @@
-FROM python:3.8 AS builder
+FROM python:3.12.14-bookworm AS builder
 
 WORKDIR /src
 COPY . .
@@ -8,7 +8,7 @@ RUN python -m venv /opt/venv \
     && pip install --no-cache-dir -U pip setuptools wheel \
     && pip install --no-cache-dir .
 
-FROM python:3.8-slim
+FROM python:3.12.14-slim-bookworm
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /src/scripts/docker-entrypoint.sh /entrypoint.sh
 

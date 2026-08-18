@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 from datetime import datetime
 import random
-from typing import List, Dict, Tuple, Type
+from typing import Callable, Dict, List, Optional, Tuple, Type
 
 from loguru import logger
 
@@ -11,7 +12,7 @@ from embykeeper.schedule import Scheduler
 from embykeeper.schema import TelegramAccount
 from embykeeper.config import config
 from embykeeper.runinfo import RunContext, RunStatus
-from embykeeper.utils import AsyncTaskPool, show_exception
+from embykeeper.utils import show_exception
 
 from .checkiner import BaseBotCheckin
 from .dynamic import extract, get_cls, get_names
@@ -21,176 +22,516 @@ from .pyrogram import Client
 logger = logger.bind(scheme="telechecker")
 
 
+@dataclass
+class _CheckinSiteSpec:
+    key: str
+    site_name: str
+    cls: Type[BaseBotCheckin]
+
+
+@dataclass
+class _SchedulerSpec:
+    key: str
+    signature: Tuple
+    factory: Callable[[], Scheduler]
+
+
+@dataclass
+class _AccountState:
+    account: TelegramAccount
+    task: Optional[asyncio.Task] = None
+    site_tasks: Dict[str, asyncio.Task] = field(default_factory=dict)
+    batch_tasks: Dict[str, asyncio.Task] = field(default_factory=dict)
+    reconcile_event: asyncio.Event = field(default_factory=asyncio.Event)
+    force_batch_refresh: bool = False
+    instant: bool = False
+    sem: Optional[asyncio.Semaphore] = None
+    batch_results: Dict[str, Tuple[BaseBotCheckin, RunContext]] = field(default_factory=dict)
+
+
 class CheckinerManager:
-    """签到管理器"""
+    """Check-in manager."""
 
     def __init__(self):
-        self._tasks: Dict[str, asyncio.Task] = {}  # phone -> task
-        self._site_tasks: Dict[str, Dict[str, asyncio.Task]] = {}  # phone -> site -> task
-        self._schedulers: Dict[str, Scheduler] = {}  # phone -> scheduler
-        self._pool = AsyncTaskPool()
+        self._accounts: Dict[str, _AccountState] = {}
+        self._schedulers: Dict[str, Scheduler] = {}
+        self._scheduler_tasks: Dict[str, asyncio.Task] = {}
+        self._scheduler_signatures: Dict[str, Tuple] = {}
+        self._keepalive = asyncio.Event()
+        self._reconcile_lock = asyncio.Lock()
+        self._reconcile_task: Optional[asyncio.Task] = None
+        self._reconcile_dirty = False
 
         config.on_list_change("telegram.account", self._handle_account_change)
         config.on_change("checkiner", self._handle_config_change)
         config.on_change("site.checkiner", self._handle_config_change)
 
-    def _handle_config_change(self, *args):
-        """Handle changes to the checkiner configuration"""
-        # Stop all existing schedulers
-        for phone in list(self._schedulers.keys()):
-            self.stop_account(phone)
+    def _module_enabled(self):
+        return bool(config.checkiner.enabled) if config.checkiner else True
 
-        # Reschedule all accounts with the new configuration
-        for account in config.telegram.account:
-            if account.enabled and account.checkiner:
-                scheduler = self.schedule_account(account)
-                self._pool.add(scheduler.schedule())
+    @staticmethod
+    def _account_signature(account: TelegramAccount):
+        return (account.phone, account.api_id, account.api_hash, account.session)
 
-        logger.info("已根据新的配置重新安排所有签到任务.")
+    def _request_reconcile(self):
+        self._reconcile_dirty = True
 
-    def _handle_account_change(self, added: List[TelegramAccount], removed: List[TelegramAccount]):
-        """Handle account additions and removals"""
-        for account in removed:
-            self.stop_account(account.phone)
-            logger.info(f"{account.phone} 账号的签到及其计划任务已被清除.")
+        if self._reconcile_task and not self._reconcile_task.done():
+            return self._reconcile_task
 
-        for account in added:
-            scheduler = self.schedule_account(account)
-            self._pool.add(scheduler.schedule())
-            logger.info(f"新增的 {account.phone} 账号的计划任务已增加.")
+        self._reconcile_task = asyncio.create_task(self._run_reconcile_loop())
+        return self._reconcile_task
 
-    def stop_account(self, phone: str):
-        """Stop scheduling and running tasks for an account"""
-        # Cancel main checkin task
-        if phone in self._tasks:
-            self._tasks[phone].cancel()
-            del self._tasks[phone]
+    def _cancel_reconcile_task(self):
+        if self._reconcile_task and not self._reconcile_task.done():
+            self._reconcile_task.cancel()
+        self._reconcile_task = None
+        self._reconcile_dirty = False
 
-        # Cancel all site-specific tasks
-        if phone in self._site_tasks:
-            for task in self._site_tasks[phone].values():
-                task.cancel()
-            del self._site_tasks[phone]
+    async def _run_reconcile_loop(self):
+        try:
+            async with self._reconcile_lock:
+                while self._reconcile_dirty:
+                    self._reconcile_dirty = False
+                    await self._reconcile()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning("根据新的配置更新签到任务时出错.")
+            show_exception(e, regular=False)
+        finally:
+            if self._reconcile_task is asyncio.current_task():
+                self._reconcile_task = None
+            if self._reconcile_dirty:
+                self._request_reconcile()
 
-        # Cancel main account scheduler
-        if phone in self._schedulers:
-            del self._schedulers[phone]
+    def _desired_accounts(self):
+        if not self._module_enabled():
+            return {}
 
-        # Cancel all independent site schedulers for this account
-        keys_to_remove = []
-        for key in self._schedulers.keys():
-            if key.startswith(f"{phone}."):
-                keys_to_remove.append(key)
+        accounts = config.telegram.account if config.telegram and config.telegram.account else []
+        return {a.phone: a for a in accounts if a.enabled and a.checkiner}
 
-        for key in keys_to_remove:
-            del self._schedulers[key]
+    def _ensure_state(self, account: TelegramAccount):
+        state = self._accounts.get(account.phone)
+        if not state:
+            state = _AccountState(account=account)
+            self._accounts[account.phone] = state
+        else:
+            state.account = account
+        return state
+
+    def _resolve_site_names(self, account: TelegramAccount):
+        if account.site and account.site.checkiner is not None:
+            return account.site.checkiner
+        if config.site and config.site.checkiner is not None:
+            return config.site.checkiner
+        return get_names("checkiner")
+
+    @staticmethod
+    def _get_site_name(cls: Type[BaseBotCheckin]):
+        if hasattr(cls, "templ_name"):
+            return cls.templ_name
+        return cls.__module__.rsplit(".", 1)[-1]
+
+    @staticmethod
+    def _site_name_from_key(key: str):
+        return key.split(":", 1)[0]
+
+    def _build_checkin_specs(self, account: TelegramAccount):
+        site_names = self._resolve_site_names(account)
+        clses: List[Type[BaseBotCheckin]] = extract(get_cls("checkiner", names=site_names))
+        specs = []
+        for cls in clses:
+            site_name = self._get_site_name(cls)
+            key = f"{site_name}:{cls.__module__}.{cls.__qualname__}"
+            specs.append(_CheckinSiteSpec(key=key, site_name=site_name, cls=cls))
+        return specs, site_names, account.checkiner_config or config.checkiner
+
+    def _desired_site_names(self, account: TelegramAccount):
+        specs, _, _ = self._build_checkin_specs(account)
+        return {spec.site_name for spec in specs}
 
     def _has_independent_time_range(self, site_name: str, config_to_use) -> bool:
-        """Check if a site has independent time_range configuration"""
         site_config = config_to_use.get_site_config(site_name)
         return isinstance(site_config, dict) and "time_range" in site_config
 
-    def _schedule_independent_sites(self, account: TelegramAccount, config_to_use):
-        """Schedule sites with independent time_range configurations"""
-        from .dynamic import get_cls, get_names, extract
+    def _build_batch_specs(self, account: TelegramAccount):
+        specs, site_names, config_to_use = self._build_checkin_specs(account)
+        batch_specs = [
+            spec for spec in specs if not self._has_independent_time_range(spec.site_name, config_to_use)
+        ]
+        return batch_specs, specs, site_names, config_to_use
 
-        # Get checkin classes based on account config or global config
-        site = None
-        if account.site and account.site.checkiner is not None:
-            site = account.site.checkiner
-        elif config.site and config.site.checkiner is not None:
-            site = config.site.checkiner
-        else:
-            site = get_names("checkiner")
+    def _build_scheduler_specs(self, account: TelegramAccount):
+        phone = account.phone
+        batch_specs, specs, _, config_to_use = self._build_batch_specs(account)
+        desired = {}
 
-        clses: List[Type[BaseBotCheckin]] = extract(get_cls("checkiner", names=site))
-
-        for cls in clses:
-            if hasattr(cls, "templ_name"):
-                site_name = cls.templ_name
-            else:
-                site_name = cls.__module__.rsplit(".", 1)[-1]
-
-            if self._has_independent_time_range(site_name, config_to_use):
-                self._schedule_independent_site(account, site_name, config_to_use)
-
-    def _schedule_independent_site(self, account: TelegramAccount, site_name: str, config_to_use):
-        """Schedule a site with independent time_range configuration"""
-        site_config = config_to_use.get_site_config(site_name)
-        site_time_range = site_config.get("time_range")
-        site_interval_days = site_config.get("interval_days", config_to_use.interval_days)
-
-        phone_masked = TelegramAccount.get_phone_masked(account.phone)
-
-        def on_next_time(t: datetime):
-            logger.info(
-                f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的签到将在 {t.strftime('%m-%d %H:%M %p')} 进行."
-            )
-            date_ctx = RunContext.get_or_create(f"checkiner.date.{t.strftime('%Y%m%d')}")
-            account_ctx = RunContext.get_or_create(f"checkiner.account.{account.phone}")
-            site_ctx = RunContext.get_or_create(f"checkiner.site.{site_name}")
-            return RunContext.prepare(
-                description=f"{account.phone} 账号 {site_name} 站点签到",
-                parent_ids=[account_ctx.id, date_ctx.id, site_ctx.id],
+        if batch_specs:
+            desired[phone] = _SchedulerSpec(
+                key=phone,
+                signature=("account", str(config_to_use.interval_days), str(config_to_use.time_range)),
+                factory=lambda phone=phone, cfg=config_to_use: self._build_account_scheduler(
+                    phone,
+                    cfg.interval_days,
+                    cfg.time_range,
+                ),
             )
 
-        def func(ctx: RunContext):
-            return asyncio.create_task(self._run_single_site(ctx, account, site_name))
+        for spec in specs:
+            if not self._has_independent_time_range(spec.site_name, config_to_use):
+                continue
 
-        scheduler = Scheduler.from_str(
-            func=func,
-            interval_days=site_interval_days,
-            time_range=site_time_range,
-            on_next_time=on_next_time,
-            description=f"{account.phone} 账号 {site_name} 站点签到定时任务",
-            sid=f"checkiner.{account.phone}.{site_name}",
-        )
+            site_config = config_to_use.get_site_config(spec.site_name)
+            site_interval_days = site_config.get("interval_days", config_to_use.interval_days)
+            site_time_range = site_config.get("time_range")
+            key = f"{phone}.{spec.site_name}"
+            desired[key] = _SchedulerSpec(
+                key=key,
+                signature=("site", spec.site_name, str(site_interval_days), str(site_time_range)),
+                factory=lambda phone=phone, site_name=spec.site_name, interval_days=site_interval_days, time_range=site_time_range: self._build_independent_site_scheduler(
+                    phone,
+                    site_name,
+                    interval_days,
+                    time_range,
+                ),
+            )
 
-        # Store scheduler with unique key
-        scheduler_key = f"{account.phone}.{site_name}"
-        self._schedulers[scheduler_key] = scheduler
-        self._pool.add(scheduler.schedule())
+        return desired
 
-    def schedule_account(self, account: TelegramAccount):
-        """Schedule checkins for an account"""
-        if (not account.checkiner) or (not account.enabled):
-            return
-
-        # Use account-specific config if available, otherwise use global
-        config_to_use = account.checkiner_config or config.checkiner
-
-        # Schedule sites with independent time_range configurations
-        self._schedule_independent_sites(account, config_to_use)
-
+    def _build_account_scheduler(self, phone: str, interval_days, time_range):
         def on_next_time(t: datetime):
-            phone_masked = TelegramAccount.get_phone_masked(account.phone)
+            phone_masked = TelegramAccount.get_phone_masked(phone)
             logger.info(f"下一次 \"{phone_masked}\" 账号的签到将在 {t.strftime('%m-%d %H:%M %p')} 进行.")
             date_ctx = RunContext.get_or_create(f"checkiner.date.{t.strftime('%Y%m%d')}")
-            account_ctx = RunContext.get_or_create(f"checkiner.account.{account.phone}")
+            account_ctx = RunContext.get_or_create(f"checkiner.account.{phone}")
             return RunContext.prepare(
-                description=f"{account.phone} 账号签到",
+                description=f"{phone} 账号签到",
                 parent_ids=[account_ctx.id, date_ctx.id],
             )
 
         def func(ctx: RunContext):
-            if account.phone in self._tasks:
-                self._tasks[account.phone].cancel()
-                del self._tasks[account.phone]
-            task = self._tasks[account.phone] = asyncio.create_task(self.run_account(ctx, account))
-            return task
+            state = self._accounts.get(phone)
+            if not state:
+                return None
+            return self._start_account_task(state, ctx, instant=False)
 
-        scheduler = Scheduler.from_str(
+        return Scheduler.from_str(
             func=func,
-            interval_days=config_to_use.interval_days,
-            time_range=config_to_use.time_range,
+            interval_days=interval_days,
+            time_range=time_range,
             on_next_time=on_next_time,
-            description=f"{account.phone} 每日签到定时任务",
-            sid=f"checkiner.{account.phone}",
+            description=f"{phone} 每日签到定时任务",
+            sid=f"checkiner.{phone}",
         )
-        self._schedulers[account.phone] = scheduler
-        return scheduler
 
-    async def _task_main(self, checkiner: BaseBotCheckin, sem: asyncio.Semaphore, wait=0):
+    def _build_independent_site_scheduler(self, phone: str, site_name: str, interval_days, time_range):
+        def on_next_time(t: datetime):
+            phone_masked = TelegramAccount.get_phone_masked(phone)
+            logger.info(
+                f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的签到将在 {t.strftime('%m-%d %H:%M %p')} 进行."
+            )
+            date_ctx = RunContext.get_or_create(f"checkiner.date.{t.strftime('%Y%m%d')}")
+            account_ctx = RunContext.get_or_create(f"checkiner.account.{phone}")
+            site_ctx = RunContext.get_or_create(f"checkiner.site.{site_name}")
+            return RunContext.prepare(
+                description=f"{phone} 账号 {site_name} 站点签到",
+                parent_ids=[account_ctx.id, date_ctx.id, site_ctx.id],
+            )
+
+        def func(ctx: RunContext):
+            return self._start_standalone_site_task(ctx, phone, site_name)
+
+        return Scheduler.from_str(
+            func=func,
+            interval_days=interval_days,
+            time_range=time_range,
+            on_next_time=on_next_time,
+            description=f"{phone} 账号 {site_name} 站点签到定时任务",
+            sid=f"checkiner.{phone}.{site_name}",
+        )
+
+    def _start_scheduler(self, spec: _SchedulerSpec):
+        scheduler = spec.factory()
+        self._schedulers[spec.key] = scheduler
+        self._scheduler_signatures[spec.key] = spec.signature
+        task = asyncio.create_task(scheduler.schedule(), name=f"Telegram 签到调度 {spec.key}")
+        self._scheduler_tasks[spec.key] = task
+        task.add_done_callback(
+            lambda t, key=spec.key, sched=scheduler: self._on_scheduler_done(key, sched, t)
+        )
+        return task
+
+    def _on_scheduler_done(self, key: str, scheduler: Scheduler, task: asyncio.Task):
+        if self._scheduler_tasks.get(key) is task:
+            del self._scheduler_tasks[key]
+        if self._schedulers.get(key) is scheduler:
+            del self._schedulers[key]
+        self._scheduler_signatures.pop(key, None)
+
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"账号 {key} 的 Telegram 签到调度任务发生错误, 该调度已停止.")
+            show_exception(e, regular=False)
+
+    async def _cancel_scheduler_keys(self, keys):
+        tasks = []
+        for key in set(keys):
+            task = self._scheduler_tasks.pop(key, None)
+            if task and not task.done():
+                task.cancel()
+                tasks.append(task)
+            self._schedulers.pop(key, None)
+            self._scheduler_signatures.pop(key, None)
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _cancel_batch_tasks(self, state: _AccountState, keys=None):
+        selected = list(keys if keys is not None else state.batch_tasks.keys())
+        tasks = []
+
+        for key in selected:
+            task = state.batch_tasks.pop(key, None)
+            if not task:
+                continue
+            if not task.done():
+                task.cancel()
+                tasks.append(task)
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _cancel_site_tasks(self, state: _AccountState, sites=None):
+        selected = list(sites if sites is not None else state.site_tasks.keys())
+        tasks = []
+
+        for site_name in selected:
+            task = state.site_tasks.pop(site_name, None)
+            if not task:
+                continue
+            if not task.done():
+                task.cancel()
+                tasks.append(task)
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _cancel_removed_site_tasks(self, state: _AccountState, desired_sites):
+        removed_sites = [site_name for site_name in state.site_tasks.keys() if site_name not in desired_sites]
+        if removed_sites:
+            await self._cancel_site_tasks(state, removed_sites)
+
+        removed_batch_keys = [
+            key for key in state.batch_tasks.keys() if self._site_name_from_key(key) not in desired_sites
+        ]
+        if removed_batch_keys:
+            await self._cancel_batch_tasks(state, removed_batch_keys)
+
+    async def _reconcile_schedulers(self, desired_specs):
+        current_keys = set(self._scheduler_tasks) | set(self._schedulers) | set(self._scheduler_signatures)
+        desired_keys = set(desired_specs)
+        restart_keys = {
+            key
+            for key in current_keys & desired_keys
+            if self._scheduler_signatures.get(key) != desired_specs[key].signature
+        }
+
+        await self._cancel_scheduler_keys((current_keys - desired_keys) | restart_keys)
+
+        for key, spec in desired_specs.items():
+            if key in self._scheduler_tasks and not self._scheduler_tasks[key].done():
+                continue
+            self._start_scheduler(spec)
+
+    async def _stop_accounts(self, phones):
+        tasks = []
+        scheduler_keys = []
+
+        for phone in set(phones):
+            state = self._accounts.pop(phone, None)
+            if state:
+                if state.task and not state.task.done():
+                    state.task.cancel()
+                    tasks.append(state.task)
+
+                for task in list(state.batch_tasks.values()) + list(state.site_tasks.values()):
+                    if task and not task.done():
+                        task.cancel()
+                        tasks.append(task)
+
+                state.batch_tasks.clear()
+                state.site_tasks.clear()
+                state.batch_results.clear()
+                state.sem = None
+
+            scheduler_keys.extend(
+                key
+                for key in set(list(self._schedulers.keys()) + list(self._scheduler_tasks.keys()))
+                if key == phone or key.startswith(f"{phone}.")
+            )
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        if scheduler_keys:
+            await self._cancel_scheduler_keys(scheduler_keys)
+
+    async def _reconcile(self):
+        desired_accounts = self._desired_accounts()
+        current_phones = set(self._accounts)
+        desired_phones = set(desired_accounts)
+
+        restart_phones = {
+            phone
+            for phone in current_phones & desired_phones
+            if self._account_signature(self._accounts[phone].account)
+            != self._account_signature(desired_accounts[phone])
+        }
+
+        await self._stop_accounts((current_phones - desired_phones) | restart_phones)
+
+        if not self._module_enabled():
+            logger.info("已根据新的配置停止所有签到任务.")
+            return
+
+        for account in desired_accounts.values():
+            self._ensure_state(account)
+
+        desired_scheduler_specs = {}
+        for account in desired_accounts.values():
+            desired_scheduler_specs.update(self._build_scheduler_specs(account))
+
+        await self._reconcile_schedulers(desired_scheduler_specs)
+
+        for phone, account in desired_accounts.items():
+            state = self._accounts.get(phone)
+            if not state:
+                continue
+
+            state.account = account
+            await self._cancel_removed_site_tasks(state, self._desired_site_names(account))
+
+            if state.task and not state.task.done():
+                state.reconcile_event.set()
+
+        if not desired_scheduler_specs and not any(
+            state.task or state.site_tasks or state.batch_tasks for state in self._accounts.values()
+        ):
+            logger.info("没有需要执行的 Telegram 机器人签到任务")
+        else:
+            logger.info("已根据新的配置收敛签到任务.")
+
+    def _on_account_task_done(self, phone: str, task: asyncio.Task):
+        state = self._accounts.get(phone)
+        if state and state.task is task:
+            state.task = None
+            state.sem = None
+            state.instant = False
+            state.reconcile_event.clear()
+
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"账户 {phone} 的签到任务发生错误, 签到已停止.")
+            show_exception(e, regular=False)
+
+    def _on_batch_task_done(self, phone: str, key: str, site_name: str, ctx: RunContext, task: asyncio.Task):
+        state = self._accounts.get(phone)
+        if state and state.batch_tasks.get(key) is task:
+            del state.batch_tasks[key]
+
+        try:
+            checkiner, result = task.result()
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"账户 {phone} 的 {site_name} 站点签到任务发生错误.")
+            show_exception(e, regular=False)
+            return
+
+        if state:
+            state.batch_results[key] = (checkiner, result)
+
+        if result.status == RunStatus.RESCHEDULE and checkiner.ctx.next_time:
+            self.schedule_site(ctx, checkiner.ctx.next_time, phone, site_name, reschedule=True)
+
+    def _on_site_task_done(self, phone: str, site_name: str, task: asyncio.Task):
+        state = self._accounts.get(phone)
+        if state and state.site_tasks.get(site_name) is task:
+            del state.site_tasks[site_name]
+
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"账户 {phone} 的 {site_name} 站点补签到任务发生错误.")
+            show_exception(e, regular=False)
+
+    def _handle_config_change(self, *args):
+        self._request_reconcile()
+
+    def _handle_account_change(self, added: List[TelegramAccount], removed: List[TelegramAccount]):
+        self._request_reconcile()
+
+    def stop_account(self, phone: str):
+        state = self._accounts.pop(phone, None)
+        if state:
+            if state.task:
+                state.task.cancel()
+            for task in list(state.batch_tasks.values()) + list(state.site_tasks.values()):
+                task.cancel()
+
+        scheduler_keys = [
+            key
+            for key in set(list(self._schedulers.keys()) + list(self._scheduler_tasks.keys()))
+            if key == phone or key.startswith(f"{phone}.")
+        ]
+        for key in scheduler_keys:
+            scheduler_task = self._scheduler_tasks.pop(key, None)
+            if scheduler_task:
+                scheduler_task.cancel()
+            self._schedulers.pop(key, None)
+            self._scheduler_signatures.pop(key, None)
+
+    def stop_all(self):
+        self._cancel_reconcile_task()
+
+        for phone in list(self._accounts.keys()):
+            self.stop_account(phone)
+
+        for key, scheduler_task in list(self._scheduler_tasks.items()):
+            scheduler_task.cancel()
+            self._scheduler_tasks.pop(key, None)
+        self._schedulers.clear()
+        self._scheduler_signatures.clear()
+
+    def _start_account_task(self, state: _AccountState, ctx: RunContext, instant: bool = False):
+        if state.task and not state.task.done():
+            state.instant = state.instant or instant
+            state.force_batch_refresh = True
+            state.reconcile_event.set()
+            return state.task
+
+        state.instant = instant
+        state.force_batch_refresh = True
+        state.batch_results.clear()
+        task = asyncio.create_task(
+            self._run_account_task(state, ctx),
+            name=f"Telegram 签到任务 {state.account.phone}",
+        )
+        state.task = task
+        task.add_done_callback(lambda t, phone=state.account.phone: self._on_account_task_done(phone, t))
+        return task
+
+    async def _run_batch_site(self, checkiner: BaseBotCheckin, sem: asyncio.Semaphore, wait=0):
         if config.debug_cron:
             wait = 0.1
         if wait > 0:
@@ -200,170 +541,151 @@ class CheckinerManager:
             result = await checkiner._start()
             return checkiner, result
 
-    async def run_account(self, ctx: RunContext, account: TelegramAccount, instant: bool = False):
-        """Run checkin for a single account"""
-        async with ClientsSession([account]) as clients:
-            async for a, client in clients:
-                await self._run_account(ctx, a, client, instant)
-
-    def schedule_site(
-        self, ctx: RunContext, at: datetime, account: TelegramAccount, site: str, reschedule: bool = False
-    ) -> asyncio.Task:
-        try:
-            account_ctx = RunContext.get_or_create(f"checkiner.account.{account.phone}")
-
-            if reschedule:
-                description = f"{account.phone} 账号 {site} 站点重新签到"
-            else:
-                description = f"{account.phone} 账号 {site} 站点签到"
-
-            site_ctx = RunContext.prepare(description=description, parent_ids=[account_ctx.id, ctx.id])
-            site_ctx.reschedule = (ctx.reschedule or 0) + 1
-
-            async def _schedule():
-                # 计算延迟时间(秒)
-                delay = (at - datetime.now()).total_seconds()
-                if delay > 0:
-                    if reschedule:
-                        logger.debug(
-                            f"已安排账户 {account.phone} 的 {site} 站点在 {at.strftime('%m-%d %H:%M %p')} 重新尝试签到."
-                        )
-                    else:
-                        logger.debug(
-                            f"已安排账户 {account.phone} 的 {site} 站点在 {at.strftime('%m-%d %H:%M %p')} 签到."
-                        )
-                    await asyncio.sleep(delay)
-                if account.phone in self._site_tasks and site in self._site_tasks[account.phone]:
-                    self._site_tasks[account.phone][site].cancel()
-                    del self._site_tasks[account.phone][site]
-                await self._run_single_site(site_ctx, account, site)
-
-            task = asyncio.create_task(_schedule())
-            # Initialize _site_tasks for this phone if it doesn't exist
-            if account.phone not in self._site_tasks:
-                self._site_tasks[account.phone] = {}
-            # Store the task
-            self._site_tasks[account.phone][site] = task
-            return task
-        except Exception as e:
-            if reschedule:
-                logger.warning(f"重新安排 {site} 站点签到时间失败: {e}")
-            else:
-                logger.warning(f"安排 {site} 站点签到时间失败: {e}")
-            show_exception(e, regular=False)
-
-    async def _run_single_site(self, ctx: RunContext, account: TelegramAccount, site_name: str):
-        async with ClientsSession([account]) as clients:
-            async for _, client in clients:
-                cls = get_cls("checkiner", names=[site_name])[0]
-                config_to_use = account.checkiner_config or config.checkiner
-
-                c: BaseBotCheckin = cls(
-                    client,
-                    context=ctx,
-                    retries=config_to_use.retries,
-                    timeout=config_to_use.timeout,
-                    config=config_to_use.get_site_config(site_name),
-                )
-
-                log = logger.bind(username=client.me.full_name, name=c.name)
-
-                result = await c._start()
-                if result.status == RunStatus.SUCCESS:
-                    log.info("重新签到成功.")
-                elif result.status == RunStatus.NONEED:
-                    log.info("多次重新签到后依然为已签到状态, 已跳过.")
-                elif result.status == RunStatus.RESCHEDULE:
-                    if c.ctx.next_time:
-                        log.debug("继续等待重新签到.")
-                        self.schedule_site(ctx, c.ctx.next_time, account, site_name, reschedule=True)
-                else:
-                    log.debug("站点重新签到失败.")
-
-    async def _run_account(
-        self, ctx: RunContext, account: TelegramAccount, client: Client, instant: bool = False
+    def _start_batch_site_task(
+        self, state: _AccountState, ctx: RunContext, client: Client, spec: _CheckinSiteSpec
     ):
-        """Run checkins for a single user"""
+        config_to_use = state.account.checkiner_config or config.checkiner
+        site_ctx = RunContext.prepare(f"{spec.site_name} 站点签到", parent_ids=ctx.id)
+        checkiner = spec.cls(
+            client,
+            context=site_ctx,
+            retries=config_to_use.retries,
+            timeout=config_to_use.timeout,
+            config=config_to_use.get_site_config(spec.site_name),
+        )
+        wait = 0 if state.instant else random.uniform(0, config_to_use.random_start)
+        task = asyncio.create_task(
+            self._run_batch_site(checkiner, state.sem, wait),
+            name=f"Telegram 签到子任务 {state.account.phone}.{spec.site_name}",
+        )
+        task.add_done_callback(
+            lambda t, phone=state.account.phone, key=spec.key, site_name=spec.site_name, root_ctx=ctx: self._on_batch_task_done(
+                phone,
+                key,
+                site_name,
+                root_ctx,
+                t,
+            )
+        )
+        state.batch_tasks[spec.key] = task
+        return checkiner.name
+
+    def _start_standalone_site_task(self, ctx: RunContext, phone: str, site_name: str):
+        state = self._accounts.get(phone)
+        if not state:
+            return None
+
+        if site_name not in self._desired_site_names(state.account):
+            return None
+
+        existing = state.site_tasks.get(site_name)
+        if existing and not existing.done():
+            existing.cancel()
+
+        task = asyncio.create_task(
+            self._run_single_site(ctx, phone, site_name),
+            name=f"Telegram 单站点签到任务 {phone}.{site_name}",
+        )
+        task.add_done_callback(
+            lambda t, phone=phone, site_name=site_name: self._on_site_task_done(phone, site_name, t)
+        )
+        state.site_tasks[site_name] = task
+        return task
+
+    async def _run_account_task(self, state: _AccountState, ctx: RunContext):
+        try:
+            async with ClientsSession([state.account]) as clients:
+                async for _, client in clients:
+                    await self._run_account(ctx, state, client)
+        finally:
+            await self._cancel_batch_tasks(state)
+            state.sem = None
+
+    async def _run_account(self, ctx: RunContext, state: _AccountState, client: Client):
         log = logger.bind(username=client.me.full_name)
+        batch_specs, specs, site_names, config_to_use = self._build_batch_specs(state.account)
 
-        # Get checkin classes based on account config or global config
-        site = None
-        if account.site and account.site.checkiner is not None:
-            site = account.site.checkiner
-        elif config.site and config.site.checkiner is not None:
-            site = config.site.checkiner
-        else:
-            site = get_names("checkiner")
-
-        clses: List[Type[BaseBotCheckin]] = extract(get_cls("checkiner", names=site))
-
-        if not clses:
-            if site is not None:  # Only show warning if sites were specified but none were valid
+        if not specs:
+            if site_names is not None:
                 log.warning("没有任何有效签到站点, 签到将跳过.")
+            return
+
+        if not batch_specs:
             return
 
         log.warning("Auth Bot 不可用，已跳过 CHECKINER 总认证并直接启动签到站点。")
 
-        config_to_use = account.checkiner_config or config.checkiner
-        sem = asyncio.Semaphore(config_to_use.concurrency)
-        checkiners = []
-        for cls in clses:
-            if hasattr(cls, "templ_name"):
-                site_name = cls.templ_name
-            else:
-                site_name = cls.__module__.rsplit(".", 1)[-1]
+        state.sem = asyncio.Semaphore(config_to_use.concurrency)
+        state.batch_results.clear()
+        state.reconcile_event.set()
 
-            # Skip sites with independent time_range configurations
-            if self._has_independent_time_range(site_name, config_to_use):
-                log.debug(f"跳过站点 {site_name}, 该站点有独立的 time_range 配置")
+        while True:
+            if state.reconcile_event.is_set():
+                state.reconcile_event.clear()
+                await self._reconcile_running_account(state, ctx, client, log)
+
+            if not state.batch_tasks:
+                break
+
+            waiter = asyncio.create_task(state.reconcile_event.wait())
+            try:
+                await asyncio.wait([waiter, *state.batch_tasks.values()], return_when=asyncio.FIRST_COMPLETED)
+            finally:
+                if not waiter.done():
+                    waiter.cancel()
+                await asyncio.gather(waiter, return_exceptions=True)
+
+        self._log_batch_summary(state.batch_results, log)
+        state.batch_results.clear()
+
+    async def _reconcile_running_account(self, state: _AccountState, ctx: RunContext, client: Client, log):
+        batch_specs, specs, site_names, _ = self._build_batch_specs(state.account)
+
+        if not specs:
+            await self._cancel_batch_tasks(state)
+            if site_names is not None:
+                log.warning("没有任何有效签到站点, 签到将跳过.")
+            return
+
+        if state.force_batch_refresh:
+            await self._cancel_batch_tasks(state)
+            state.force_batch_refresh = False
+
+        desired_keys = {spec.key for spec in batch_specs}
+        removed_keys = [key for key in state.batch_tasks.keys() if key not in desired_keys]
+        if removed_keys:
+            await self._cancel_batch_tasks(state, removed_keys)
+
+        started_names = []
+        for spec in batch_specs:
+            if spec.key in state.batch_tasks:
                 continue
+            if spec.site_name in state.site_tasks:
+                await self._cancel_site_tasks(state, [spec.site_name])
+            started_names.append(self._start_batch_site_task(state, ctx, client, spec))
 
-            site_ctx = RunContext.prepare(f"{site_name} 站点签到", parent_ids=ctx.id)
-            checkiners.append(
-                cls(
-                    client,
-                    context=site_ctx,
-                    retries=config_to_use.retries,
-                    timeout=config_to_use.timeout,
-                    config=config_to_use.get_site_config(site_name),
-                )
-            )
+        if started_names:
+            log.info(f'已启用签到器: {", ".join(started_names)}')
 
-        tasks = []
-        names = []
-        for c in checkiners:
-            names.append(c.name)
-            wait = 0 if instant else random.uniform(0, config_to_use.random_start)
-            task = self._task_main(c, sem, wait)
-            tasks.append(task)
-
-        if names:
-            log.info(f'已启用签到器: {", ".join(names)}')
-
-        results: List[Tuple[BaseBotCheckin, RunContext]] = await asyncio.gather(*tasks)
+    @staticmethod
+    def _log_batch_summary(results, log):
+        if not results:
+            return
 
         failed = []
         ignored = []
         successful = []
         checked = []
 
-        for c, result in results:
+        for checkiner, result in results.values():
             if result.status == RunStatus.IGNORE:
-                ignored.append(c.name)
+                ignored.append(checkiner.name)
             elif result.status == RunStatus.SUCCESS:
-                successful.append(c.name)
-            elif result.status == RunStatus.NONEED:
-                checked.append(c.name)
-            elif result.status == RunStatus.RESCHEDULE:
-                if hasattr(c, "templ_name"):
-                    site_name = c.templ_name
-                else:
-                    site_name = cls.__module__.rsplit(".", 1)[-1]
-                if c.ctx.next_time:
-                    self.schedule_site(ctx, c.ctx.next_time, account, site_name, reschedule=True)
-                checked.append(c.name)
+                successful.append(checkiner.name)
+            elif result.status in (RunStatus.NONEED, RunStatus.RESCHEDULE):
+                checked.append(checkiner.name)
             else:
-                failed.append(c.name)
+                failed.append(checkiner.name)
 
         spec = f"共{len(successful) + len(checked) + len(failed) + len(ignored)}个"
         if successful:
@@ -391,23 +713,129 @@ class CheckinerManager:
             suffix = f": {'; '.join(details)}" if details else "."
             log.bind(log=True).info(f"签到成功 ({spec}){suffix}")
 
+    def schedule_site(
+        self, ctx: RunContext, at: datetime, phone: str, site_name: str, reschedule: bool = False
+    ):
+        state = self._accounts.get(phone)
+        if not state:
+            return None
+
+        try:
+            account_ctx = RunContext.get_or_create(f"checkiner.account.{phone}")
+
+            if reschedule:
+                description = f"{phone} 账号 {site_name} 站点重新签到"
+            else:
+                description = f"{phone} 账号 {site_name} 站点签到"
+
+            site_ctx = RunContext.prepare(description=description, parent_ids=[account_ctx.id, ctx.id])
+            site_ctx.reschedule = (ctx.reschedule or 0) + 1
+
+            async def _schedule():
+                delay = (at - datetime.now()).total_seconds()
+                if delay > 0:
+                    if reschedule:
+                        logger.debug(
+                            f"已安排账户 {phone} 的 {site_name} 站点在 {at.strftime('%m-%d %H:%M %p')} 重新尝试签到."
+                        )
+                    else:
+                        logger.debug(
+                            f"已安排账户 {phone} 的 {site_name} 站点在 {at.strftime('%m-%d %H:%M %p')} 签到."
+                        )
+                    await asyncio.sleep(delay)
+                await self._run_single_site(site_ctx, phone, site_name)
+
+            existing = state.site_tasks.get(site_name)
+            if existing and not existing.done():
+                existing.cancel()
+
+            task = asyncio.create_task(
+                _schedule(),
+                name=f"Telegram 补签到任务 {phone}.{site_name}",
+            )
+            task.add_done_callback(
+                lambda t, phone=phone, site_name=site_name: self._on_site_task_done(phone, site_name, t)
+            )
+            state.site_tasks[site_name] = task
+            return task
+        except Exception as e:
+            if reschedule:
+                logger.warning(f"重新安排 {site_name} 站点签到时间失败: {e}")
+            else:
+                logger.warning(f"安排 {site_name} 站点签到时间失败: {e}")
+            show_exception(e, regular=False)
+            return None
+
+    async def _run_single_site(self, ctx: RunContext, phone: str, site_name: str):
+        state = self._accounts.get(phone)
+        if not state:
+            return
+
+        if site_name not in self._desired_site_names(state.account):
+            return
+
+        account = state.account
+
+        async with ClientsSession([account]) as clients:
+            async for _, client in clients:
+                clses = get_cls("checkiner", names=[site_name])
+                if not clses:
+                    return
+
+                cls = clses[0]
+                config_to_use = account.checkiner_config or config.checkiner
+
+                checkiner: BaseBotCheckin = cls(
+                    client,
+                    context=ctx,
+                    retries=config_to_use.retries,
+                    timeout=config_to_use.timeout,
+                    config=config_to_use.get_site_config(site_name),
+                )
+
+                log = logger.bind(username=client.me.full_name, name=checkiner.name)
+
+                result = await checkiner._start()
+                if result.status == RunStatus.SUCCESS:
+                    log.info("重新签到成功.")
+                elif result.status == RunStatus.NONEED:
+                    log.info("多次重新签到后依然为已签到状态, 已跳过.")
+                elif result.status == RunStatus.RESCHEDULE:
+                    if checkiner.ctx.next_time:
+                        log.debug("继续等待重新签到.")
+                        self.schedule_site(ctx, checkiner.ctx.next_time, phone, site_name, reschedule=True)
+                else:
+                    log.debug("站点重新签到失败.")
+
     def new_ctx(self):
         now = datetime.now()
-        ctx = RunContext.get_or_create(
+        return RunContext.get_or_create(
             f"checkiner.run.{now.timestamp()}",
             description=f"{now.strftime('%Y-%m-%d')} 签到",
         )
-        return ctx
+
+    async def run_account(self, ctx: RunContext, account: TelegramAccount, instant: bool = False):
+        state = self._ensure_state(account)
+        task = self._start_account_task(state, ctx, instant=instant)
+        if task:
+            return await task
 
     async def run_all(self, instant: bool = False):
-        """Run checkins for all enabled accounts without scheduling"""
+        if not self._module_enabled():
+            return None
+
         accounts = [a for a in config.telegram.account if a.enabled and a.checkiner]
         tasks = [
-            asyncio.create_task(self.run_account(RunContext.prepare("运行全部签到器"), account, instant))
+            self._start_account_task(
+                self._ensure_state(account), RunContext.prepare("运行全部签到器"), instant
+            )
             for account in accounts
         ]
+        tasks = [task for task in tasks if task]
+
         try:
-            await asyncio.gather(*tasks)
+            if tasks:
+                await asyncio.gather(*tasks)
         except asyncio.CancelledError:
             for task in tasks:
                 if not task.done():
@@ -416,15 +844,12 @@ class CheckinerManager:
             raise
 
     async def schedule_all(self):
-        """Start scheduling checkins for all accounts"""
+        task = self._request_reconcile()
+        if task:
+            await task
 
-        for a in config.telegram.account:
-            if a.enabled and a.checkiner:
-                scheduler = self.schedule_account(a)
-                self._pool.add(scheduler.schedule())
-
-        if not self._schedulers:
-            logger.info("没有需要执行的 Telegram 机器人签到任务")
-            return None
-
-        await self._pool.wait()
+        try:
+            await self._keepalive.wait()
+        except asyncio.CancelledError:
+            self.stop_all()
+            raise

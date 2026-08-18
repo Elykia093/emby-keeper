@@ -456,6 +456,20 @@ class ConfigManager(ProxyBase):
         doc.add(nl())
 
         doc.add(comment("=" * 80))
+        doc.add(comment("Cloudflare Turnstile 求解 (可选)"))
+        doc.add(comment("月饼 embyguard 等站点需要; 也可通过环境变量 SOLVER_URL / YESCAPTCHA_KEY 配置"))
+        doc.add(comment("=" * 80))
+        doc.add(nl())
+        c = item({})
+        c.add(comment("自建 turnsolve 地址; 多个用逗号分隔, 失败自动换下一个:"))
+        c["solver_url"] = "http://127.0.0.1:8889,http://10.0.0.2:8889"
+        c.add(comment("YesCaptcha API Key (设置后优先走 YesCaptcha, 不再请求 solver_url):"))
+        c["yescaptcha_key"] = ""
+        for line in c.as_string().strip().split("\n"):
+            doc.add(comment(line))
+        doc.add(nl())
+
+        doc.add(comment("=" * 80))
         doc.add(comment("日志推送相关设置"))
         doc.add(comment(f"详见: https://emby-keeper.github.io/guide/配置文件#notifier-子项"))
         doc.add(comment("=" * 80))

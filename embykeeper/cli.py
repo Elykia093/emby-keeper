@@ -173,6 +173,25 @@ async def main(
         rich_help_panel="模块开关",
         help="快速反复尝试注册指定机器人 (Embyboss)",
     ),
+    api: bool = typer.Option(
+        False,
+        "--api",
+        "-a",
+        rich_help_panel="模块开关",
+        help="启动 API 服务器模式",
+    ),
+    api_host: str = typer.Option(
+        "0.0.0.0",
+        "--api-host",
+        rich_help_panel="模块开关",
+        help="API 服务器绑定地址",
+    ),
+    api_port: int = typer.Option(
+        8000,
+        "--api-port",
+        rich_help_panel="模块开关",
+        help="API 服务器端口",
+    ),
     version: bool = typer.Option(
         None,
         "--version",
@@ -384,6 +403,23 @@ async def main(
         if not await config.reload_conf(config_file):
             raise typer.Exit(1)
 
+    if api:
+        logger.info(f"启动 API 服务器模式, 监听 {api_host}:{api_port}")
+        import uvicorn
+        from .api import create_app
+
+        app = create_app()
+        config_obj = uvicorn.Config(
+            app,
+            host=api_host,
+            port=api_port,
+            access_log=verbosity >= 1,
+            log_config=None,
+        )
+        server = uvicorn.Server(config_obj)
+        await server.serve()
+        return
+
     if verbosity >= 2:
         config.nofail = False
     if not config.nofail:
@@ -521,6 +557,247 @@ async def main(
             subsonic_man = SubsonicManager()
 
         pool = AsyncTaskPool()
+        telegram_runtime_tasks = {}
+        media_runtime_tasks = {}
+        runtime_restart_lock = asyncio.Lock()
+
+        async def await_runtime_task(task: asyncio.Task):
+            return await task
+
+        def track_runtime_task(task_store: dict, name: str, coro, description: str):
+            task = asyncio.create_task(coro, name=description)
+            task_store[name] = task
+
+            def on_done(t: asyncio.Task, key: str = name, store: dict = task_store):
+                if store.get(key) is t:
+                    del store[key]
+
+            task.add_done_callback(on_done)
+            pool.add(await_runtime_task(task), description)
+            return task
+
+        def start_telegram_runtime_tasks(targets=None):
+            selected = set(targets or ("checkiner", "registrar", "monitor", "messager"))
+            if "checkiner" in selected and checkin_man:
+                track_runtime_task(
+                    telegram_runtime_tasks, "checkiner", checkin_man.schedule_all(), "站点签到"
+                )
+            if "registrar" in selected and register_man:
+                track_runtime_task(telegram_runtime_tasks, "registrar", register_man.start(), "站点注册")
+            if "monitor" in selected and monitor_man:
+                track_runtime_task(telegram_runtime_tasks, "monitor", monitor_man.run_all(), "群组监控")
+            if "messager" in selected and message_man:
+                track_runtime_task(telegram_runtime_tasks, "messager", message_man.run_all(), "自动水群")
+
+        def start_media_runtime_tasks(targets=None):
+            selected = set(targets or ("emby", "subsonic"))
+            if "emby" in selected and emby_man:
+                track_runtime_task(media_runtime_tasks, "emby", emby_man.schedule_all(), "Emby 保活")
+            if "subsonic" in selected and subsonic_man:
+                track_runtime_task(
+                    media_runtime_tasks, "subsonic", subsonic_man.schedule_all(), "Subsonic 保活"
+                )
+
+        async def cancel_runtime_tasks(task_store: dict, targets):
+            selected = set(targets)
+            current_tasks = [
+                task_store.get(name)
+                for name in selected
+                if task_store.get(name) and not task_store.get(name).done()
+            ]
+            for task in current_tasks:
+                task.cancel()
+            if current_tasks:
+                await asyncio.gather(*current_tasks, return_exceptions=True)
+            for name in selected:
+                task_store.pop(name, None)
+
+        def has_active_telegram_accounts(attr: str):
+            accounts = config.telegram.account if config.telegram and config.telegram.account else []
+            return any(account.enabled and getattr(account, attr, False) for account in accounts)
+
+        def telegram_checkiner_active():
+            return bool(
+                checkin_man
+                and config.checkiner
+                and config.checkiner.enabled
+                and has_active_telegram_accounts("checkiner")
+            )
+
+        def telegram_monitor_active():
+            return bool(
+                monitor_man
+                and config.monitor
+                and config.monitor.enabled
+                and has_active_telegram_accounts("monitor")
+            )
+
+        def telegram_messager_active():
+            return bool(
+                message_man
+                and config.messager
+                and config.messager.enabled
+                and has_active_telegram_accounts("messager")
+            )
+
+        def telegram_registrar_active():
+            return bool(
+                register_man
+                and config.registrar
+                and config.registrar.enabled
+                and has_active_telegram_accounts("registrar")
+            )
+
+        def notifier_uses_telegram_proxy():
+            return bool(
+                config.notifier
+                and config.notifier.enabled
+                and config.notifier.method == "telegram"
+                and config.telegram
+                and config.telegram.use_proxy
+            )
+
+        def get_telegram_use_proxy_restart_targets():
+            targets = set()
+            if telegram_checkiner_active():
+                targets.add("checkiner")
+            if telegram_monitor_active():
+                targets.add("monitor")
+            if telegram_messager_active():
+                targets.add("messager")
+            if telegram_registrar_active():
+                targets.add("registrar")
+            return targets
+
+        def get_proxy_telegram_restart_targets():
+            targets = set()
+
+            if config.telegram and config.telegram.use_proxy:
+                if telegram_checkiner_active():
+                    targets.add("checkiner")
+                if telegram_monitor_active():
+                    targets.add("monitor")
+                if telegram_messager_active():
+                    targets.add("messager")
+                if telegram_registrar_active():
+                    targets.add("registrar")
+
+            return targets
+
+        def get_proxy_media_restart_targets():
+            targets = set()
+
+            emby_accounts = config.emby.account if config.emby and config.emby.account else []
+            if (
+                emby_man
+                and config.emby
+                and config.emby.enabled
+                and any(a.enabled and a.use_proxy for a in emby_accounts)
+            ):
+                targets.add("emby")
+
+            subsonic_accounts = config.subsonic.account if config.subsonic and config.subsonic.account else []
+            if (
+                subsonic_man
+                and config.subsonic
+                and config.subsonic.enabled
+                and any(a.enabled and a.use_proxy for a in subsonic_accounts)
+            ):
+                targets.add("subsonic")
+
+            return targets
+
+        async def restart_telegram_runtime_locked(reason: str, targets, clean_sessions: bool = False):
+            selected = set(targets)
+            if not selected and not clean_sessions:
+                return
+
+            logger.bind(scheme="config").warning(
+                f"检测到 {reason} 变更, 正在重启受影响的 Telegram 相关模块以应用新设置."
+            )
+
+            await cancel_runtime_tasks(telegram_runtime_tasks, selected)
+
+            if "checkiner" in selected and checkin_man:
+                checkin_man.stop_all()
+            if "registrar" in selected and register_man:
+                register_man.stop_all()
+            if "monitor" in selected and monitor_man:
+                monitor_man.stop_all()
+            if "messager" in selected and message_man:
+                message_man.stop_all()
+
+            if clean_sessions:
+                from .telegram.session import ClientsSession
+
+                await ClientsSession.clean_all(force=True)
+
+            if selected:
+                start_telegram_runtime_tasks(selected)
+
+            logger.info("Telegram 受影响模块已按新的代理设置重新启动.")
+
+        async def restart_media_runtime_locked(reason: str, targets):
+            selected = set(targets)
+            if not selected:
+                return
+
+            logger.bind(scheme="config").warning(
+                f"检测到 {reason} 变更, 正在重启受影响的媒体保活模块以应用新设置."
+            )
+
+            await cancel_runtime_tasks(media_runtime_tasks, selected)
+
+            if "emby" in selected and emby_man:
+                emby_man.stop_all()
+            if "subsonic" in selected and subsonic_man:
+                subsonic_man.stop_all()
+
+            start_media_runtime_tasks(selected)
+            logger.info("媒体保活模块已按新的代理设置重新启动.")
+
+        async def handle_telegram_use_proxy_change_async(*args):
+            if once:
+                return
+
+            targets = get_telegram_use_proxy_restart_targets()
+            clean_sessions = bool(targets) or notifier_uses_telegram_proxy()
+            if not targets and not clean_sessions:
+                return
+
+            async with runtime_restart_lock:
+                await restart_telegram_runtime_locked("Telegram 代理设置", targets, clean_sessions=True)
+
+        async def handle_proxy_change_async(*args):
+            if once:
+                return
+
+            telegram_targets = get_proxy_telegram_restart_targets()
+            media_targets = get_proxy_media_restart_targets()
+            clean_telegram_sessions = notifier_uses_telegram_proxy() or bool(
+                config.telegram and config.telegram.use_proxy and telegram_targets
+            )
+
+            if not telegram_targets and not media_targets and not clean_telegram_sessions:
+                logger.bind(scheme="config").info(
+                    "检测到代理设置变更, 当前没有运行中的模块依赖该代理, 跳过重启."
+                )
+                return
+
+            async with runtime_restart_lock:
+                await restart_telegram_runtime_locked(
+                    "代理设置", telegram_targets, clean_sessions=clean_telegram_sessions
+                )
+                await restart_media_runtime_locked("代理设置", media_targets)
+
+        def handle_telegram_use_proxy_change(*args):
+            asyncio.create_task(handle_telegram_use_proxy_change_async(*args))
+
+        def handle_proxy_change(*args):
+            asyncio.create_task(handle_proxy_change_async(*args))
+
+        config.on_change("telegram.use_proxy", handle_telegram_use_proxy_change)
+        config.on_change("proxy", handle_proxy_change)
 
         if registrar_bot:
             logger.info(f"开始快速注册 @{registrar_bot}")
@@ -544,18 +821,8 @@ async def main(
 
             streams = await start_notifier()
         if not once:
-            if checkin_man:
-                pool.add(checkin_man.schedule_all(), "站点签到")
-            if register_man:
-                pool.add(register_man.start(), "站点注册")
-            if monitor_man:
-                pool.add(monitor_man.run_all(), "群组监控")
-            if message_man:
-                pool.add(message_man.run_all(), "自动水群")
-            if emby_man:
-                pool.add(emby_man.schedule_all(), "Emby 保活")
-            if subsonic_man:
-                pool.add(subsonic_man.schedule_all(), "Subsonic 保活")
+            start_telegram_runtime_tasks()
+            start_media_runtime_tasks()
         if config.noexit:
             logger.info("处于长期监控模式, 当没有账号时将继续监控等待新配置.")
             pool.add(asyncio.Event().wait(), "账号配置文件监控")

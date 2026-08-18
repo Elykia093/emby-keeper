@@ -9,9 +9,9 @@ from pyrogram.errors import MessageIdInvalid
 from PIL import Image
 import numpy as np
 
-from embykeeper.config import config
 from embykeeper.utils import show_exception, get_proxy_str
 
+from .. import get_telegram_proxy_config
 from ..lock import pornfans_alert
 from . import Monitor
 
@@ -54,7 +54,7 @@ class _PornfansExamAnswerMonitor(Monitor):
             else:
                 self.log.info(
                     f"验证码解析将使用代理, 可能导致解析失败, 若失败请使用"
-                    '"use_proxy = false" 以禁用该站点的代理.'
+                    '"telegram.use_proxy = false" 以禁用 Telegram 侧代理.'
                 )
         try:
             cf_clearance, useragent = await get_cf_clearance(JAVDATABASE_URL, self.proxy)
@@ -71,7 +71,7 @@ class _PornfansExamAnswerMonitor(Monitor):
             return False
 
     async def init(self):
-        self.proxy = config.proxy
+        self.proxy = get_telegram_proxy_config()
         self.useragent = None
         self.cf_clearance = None
         for _ in range(3):

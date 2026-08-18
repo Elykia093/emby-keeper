@@ -1,7 +1,7 @@
 # A script to download the embeddable Python of a given version
 # Also configures the embeddable Python to allow pip (it's not allowed by default)
 # Usage: .\download_python.ps1 -Version <Version> [-TargetDirectory <TargetDirectory>]
-# Example: .\download_python.ps1 3.8.0 -TargetDirectory C:\Python\3.8.0
+# Example: .\download_python.ps1 3.12.10 -TargetDirectory C:\Python\3.12.10
 
 param(
     [Parameter(Mandatory=$true)]

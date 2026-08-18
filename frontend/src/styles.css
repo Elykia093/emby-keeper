@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply transition-colors duration-200;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+@layer components {
+  .ek-terminal {
+    background-image:
+      linear-gradient(rgba(15, 23, 42, 0.18) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.14) 1px, transparent 1px);
+    background-size: 100% 28px, 28px 100%;
+    background-color: #020617;
+  }
+
+  .ek-log-ripple {
+    animation: ek-log-ripple 1.8s ease-out infinite;
+  }
+}
+
+@keyframes ek-log-ripple {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.95);
+  }
+
+  70% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}

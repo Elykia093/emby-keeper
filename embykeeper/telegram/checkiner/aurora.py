@@ -6,8 +6,8 @@ from pyrogram.raw.functions.users import GetFullUser
 from pyrogram.raw.functions.messages import RequestWebView
 
 from embykeeper.runinfo import RunStatus
-from embykeeper.utils import get_proxy_str
-from embykeeper.config import config
+
+from .. import get_telegram_proxy_str
 
 from . import BotCheckin
 
@@ -39,7 +39,7 @@ class AuroraCheckin(BotCheckin):
 
         try:
             async with AsyncSession(
-                proxy=get_proxy_str(config.proxy, curl=True), impersonate="edge", allow_redirects=True
+                proxy=get_telegram_proxy_str(curl=True), impersonate="edge", allow_redirects=True
             ) as session:
                 # 登录获取token
                 headers = {"Authorization": f"tma {webapp_data}"}

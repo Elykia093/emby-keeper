@@ -10,10 +10,10 @@ from pyrogram.raw.functions.messages import RequestWebView
 from faker import Faker
 import httpx
 
-from embykeeper.config import config
-from embykeeper.utils import to_iterable, truncate_str, get_proxy_str
+from embykeeper.utils import to_iterable, truncate_str
 from embykeeper.runinfo import RunStatus
 
+from .. import get_telegram_proxy_str
 from ..link import Link
 from ._templ_a import TemplateACheckin
 
@@ -89,7 +89,7 @@ class RujingCheckin(TemplateACheckin):
                     for i in range(10):
                         try:
                             async with httpx.AsyncClient(
-                                http2=True, proxy=get_proxy_str(config.proxy)
+                                http2=True, proxy=get_telegram_proxy_str()
                             ) as client:
                                 resp = await client.post(url_submit, headers=headers, json=data)
                                 result = resp.text

@@ -4,8 +4,7 @@ from pyrogram.raw.functions.messages import AcceptUrlAuth
 from pyrogram.raw.types import UrlAuthResultAccepted
 from faker import Faker
 
-from embykeeper.utils import get_proxy_str
-from embykeeper.config import config
+from .. import get_telegram_proxy_str
 
 from . import BotCheckin
 
@@ -32,9 +31,7 @@ class JMSCheckin(BotCheckin):
                     )
                     url = r.url
                     for _ in range(1, 3):
-                        async with httpx.AsyncClient(
-                            http2=True, proxies=get_proxy_str(config.proxy)
-                        ) as client:
+                        async with httpx.AsyncClient(http2=True, proxies=get_telegram_proxy_str()) as client:
                             resp = await client.get(url, headers={"User-Agent": Faker().safari()})
                             if resp.status_code == 200:
                                 return

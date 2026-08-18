@@ -1,0 +1,33 @@
+{
+  "name": "embykeeper-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "preview": "vite preview --port 5173"
+  },
+  "dependencies": {
+    "@headlessui/vue": "^1.7.23",
+    "@heroicons/vue": "^2.1.5",
+    "@tailwindcss/forms": "^0.5.11",
+    "clsx": "^2.1.1",
+    "pinia": "^2.1.7",
+    "tailwind-merge": "^3.5.0",
+    "vue": "^3.4.29",
+    "vue-router": "^4.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "autoprefixer": "^10.4.19",
+    "baseline-browser-mapping": "^2.10.16",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.8",
+    "vue-tsc": "2.0.29"
+  }
+}

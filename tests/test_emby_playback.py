@@ -246,6 +246,9 @@ def test_watch_main_handles_emby_init_exception_without_nameerror(monkeypatch):
         def on_list_change(self, *args, **kwargs):
             return None
 
+        def on_change(self, *args, **kwargs):
+            return None
+
     monkeypatch.setattr(emby_main_module, "config", FakeConfig())
 
     class FakeEmby:

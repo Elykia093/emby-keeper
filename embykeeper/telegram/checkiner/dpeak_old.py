@@ -4,8 +4,9 @@ from datetime import datetime
 from curl_cffi.requests import AsyncSession, RequestsError, Response
 
 from embykeeper.runinfo import RunStatus
-from embykeeper.utils import get_proxy_str, show_exception
-from embykeeper.config import config
+from embykeeper.utils import show_exception
+
+from .. import get_telegram_proxy_str
 
 from . import BotCheckin
 
@@ -20,7 +21,7 @@ class DPeakCheckin(BotCheckin):
     async def send_checkin(self, **kw):
         try:
             async with AsyncSession(
-                proxy=get_proxy_str(config.proxy, curl=True), impersonate="edge", allow_redirects=True
+                proxy=get_telegram_proxy_str(curl=True), impersonate="edge", allow_redirects=True
             ) as session:
                 tgid = self.client.me.id
                 current_time = datetime.now()
