@@ -12,7 +12,6 @@ from ..schema import Config, TelegramAccount, TelegramConfig, format_errors
 from ..config import config as config_manager
 from ..runinfo import RunContext, RunStatus
 
-
 router = APIRouter()
 
 
@@ -92,7 +91,11 @@ def _get_last_checkin_status(phone: str) -> Tuple[Optional[str], Optional[str]]:
 
         if ctx.status_info == "签到部分失败":
             status = "partial_failed"
-        elif ctx.status_info == "签到失败" or ctx.status in {RunStatus.FAIL, RunStatus.ERROR, RunStatus.CANCELLED}:
+        elif ctx.status_info == "签到失败" or ctx.status in {
+            RunStatus.FAIL,
+            RunStatus.ERROR,
+            RunStatus.CANCELLED,
+        }:
             status = "failed"
         elif ctx.status_info == "签到成功" or ctx.status == RunStatus.SUCCESS:
             status = "success"
@@ -104,7 +107,9 @@ def _get_last_checkin_status(phone: str) -> Tuple[Optional[str], Optional[str]]:
             latest_status = status
             latest_time = run_time
 
-    return latest_status, latest_time.isoformat() if latest_time and latest_time != _sort_datetime(None) else None
+    return latest_status, (
+        latest_time.isoformat() if latest_time and latest_time != _sort_datetime(None) else None
+    )
 
 
 def _replace_accounts(raw: Dict[str, Any], accounts: List[TelegramAccount]) -> Dict[str, Any]:
@@ -138,10 +143,18 @@ async def list_telegram_accounts(_: bool = Depends(require_auth)):
             "messager": 0,
             "registrar": 0,
             "use_proxy": bool(cfg.telegram.use_proxy) if cfg.telegram else True,
-            "checkiner_enabled": bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True,
-            "monitor_enabled": bool(cfg.monitor.enabled) if cfg.monitor and cfg.monitor.enabled is not None else True,
-            "messager_enabled": bool(cfg.messager.enabled) if cfg.messager and cfg.messager.enabled is not None else True,
-            "registrar_enabled": bool(cfg.registrar.enabled) if cfg.registrar and cfg.registrar.enabled is not None else True,
+            "checkiner_enabled": (
+                bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True
+            ),
+            "monitor_enabled": (
+                bool(cfg.monitor.enabled) if cfg.monitor and cfg.monitor.enabled is not None else True
+            ),
+            "messager_enabled": (
+                bool(cfg.messager.enabled) if cfg.messager and cfg.messager.enabled is not None else True
+            ),
+            "registrar_enabled": (
+                bool(cfg.registrar.enabled) if cfg.registrar and cfg.registrar.enabled is not None else True
+            ),
         }
         for a in accounts:
             status = _serialize_account(a)
@@ -184,7 +197,7 @@ async def save_telegram_settings(payload: TelegramSettingsPayload, _: bool = Dep
         merged["registrar"] = registrar_section
 
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True}
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=format_errors(e))
@@ -219,7 +232,7 @@ async def create_telegram_account(payload: TelegramAccountPayload, _: bool = Dep
         accounts.append(account)
         merged = _replace_accounts(raw, accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True, "account": _serialize_account(account)}
     except HTTPException:
         raise
@@ -230,7 +243,9 @@ async def create_telegram_account(payload: TelegramAccountPayload, _: bool = Dep
 
 
 @router.put("/telegram/accounts/{phone}")
-async def update_telegram_account(phone: str, payload: TelegramAccountPayload, _: bool = Depends(require_auth)):
+async def update_telegram_account(
+    phone: str, payload: TelegramAccountPayload, _: bool = Depends(require_auth)
+):
     try:
         _, raw, accounts = _load_telegram_accounts()
         next_account = TelegramAccount(**payload.model_dump(exclude_none=True))
@@ -252,7 +267,7 @@ async def update_telegram_account(phone: str, payload: TelegramAccountPayload, _
 
         merged = _replace_accounts(raw, next_accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True, "account": _serialize_account(next_account)}
     except HTTPException:
         raise
@@ -273,7 +288,7 @@ async def delete_telegram_account(phone: str, _: bool = Depends(require_auth)):
 
         merged = _replace_accounts(raw, next_accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {
             "success": True,
             "summary": {

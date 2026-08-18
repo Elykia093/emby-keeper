@@ -2,6 +2,7 @@ from ._templ_ai import TemplateAICheckin
 
 __ignore__ = True
 
+
 class MooncakeAICheckin(TemplateAICheckin):
     name = "月饼 AI"
     bot_username = "Moonkkbot"

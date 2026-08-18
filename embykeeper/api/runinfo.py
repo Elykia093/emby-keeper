@@ -7,7 +7,6 @@ from fastapi.responses import StreamingResponse
 from ..cache import cache
 from ..runinfo import RunContext, RunStatus, _running_runs
 
-
 router = APIRouter()
 
 
@@ -271,11 +270,13 @@ async def get_logs(
                     continue
 
                 if keyword:
-                    haystack = " ".join([
-                        str(item["message"] or ""),
-                        str(item["description"] or ""),
-                        str(item["run_id"] or ""),
-                    ]).lower()
+                    haystack = " ".join(
+                        [
+                            str(item["message"] or ""),
+                            str(item["description"] or ""),
+                            str(item["run_id"] or ""),
+                        ]
+                    ).lower()
                     if keyword.lower() not in haystack:
                         continue
 
@@ -347,7 +348,9 @@ async def list_children_runs(
 
 
 @router.get("/runinfo/logs/stream")
-async def stream_logs(include_children: bool = True, level: Optional[str] = None, keyword: Optional[str] = None):
+async def stream_logs(
+    include_children: bool = True, level: Optional[str] = None, keyword: Optional[str] = None
+):
     async def event_generator():
         import asyncio
 

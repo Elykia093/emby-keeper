@@ -17,7 +17,6 @@ from ..config import config as config_manager
 from ..runinfo import RunContext, RunStatus
 from ..emby.main import EmbyManager
 
-
 router = APIRouter()
 
 EMBY_ACCOUNT_HISTORY_LIMIT = 2
@@ -27,7 +26,7 @@ EMBY_ACCOUNT_RUN_HISTORY_LIMIT = 20
 class EmbyAccountPayload(BaseModel):
     url: str
     username: str
-    password: str = ''
+    password: str = ""
     name: Optional[str] = None
     enabled: bool = True
     use_proxy: bool = True
@@ -165,7 +164,9 @@ def _match_account_run(ctx: RunContext, account: EmbyAccount) -> bool:
     target = _account_log_target(account)
     for log in ctx.yield_logs(reverse=True):
         message = str(log.message or "")
-        if target in message and ("保活成功" in message or "保活失败" in message or "正在登陆" in message or "成功登陆" in message):
+        if target in message and (
+            "保活成功" in message or "保活失败" in message or "正在登陆" in message or "成功登陆" in message
+        ):
             return True
     return False
 
@@ -185,7 +186,9 @@ def _serialize_run_summary(ctx: RunContext) -> Dict[str, Any]:
     }
 
 
-def _account_run_history(account: EmbyAccount, limit: int = EMBY_ACCOUNT_RUN_HISTORY_LIMIT) -> List[Dict[str, Any]]:
+def _account_run_history(
+    account: EmbyAccount, limit: int = EMBY_ACCOUNT_RUN_HISTORY_LIMIT
+) -> List[Dict[str, Any]]:
     contexts = [ctx for ctx in RunContext.list_all() if _match_account_run(ctx, account)]
     contexts.sort(key=lambda ctx: _sort_datetime(ctx.end_time or ctx.start_time), reverse=True)
     return [_serialize_run_summary(ctx) for ctx in contexts[:limit]]
@@ -326,7 +329,9 @@ def _replace_accounts(raw: Dict[str, Any], accounts: List[EmbyAccount]) -> Dict[
     return merged
 
 
-def _ensure_emby_account_ids(model: Config, raw: Dict[str, Any], accounts: List[EmbyAccount]) -> Tuple[Config, Dict[str, Any], List[EmbyAccount]]:
+def _ensure_emby_account_ids(
+    model: Config, raw: Dict[str, Any], accounts: List[EmbyAccount]
+) -> Tuple[Config, Dict[str, Any], List[EmbyAccount]]:
     existing_ids = {_account_key(account) for account in accounts if _account_key(account)}
     normalized: List[EmbyAccount] = []
     changed = False
@@ -346,7 +351,7 @@ def _ensure_emby_account_ids(model: Config, raw: Dict[str, Any], accounts: List[
 
     merged = _replace_accounts(raw, normalized)
     validated = Config(**merged)
-    serialized = validated.model_dump(mode='json', exclude_none=True, exclude_unset=True)
+    serialized = validated.model_dump(mode="json", exclude_none=True, exclude_unset=True)
     _write_config_dict(serialized)
     persisted_accounts = list(validated.emby.account if validated.emby and validated.emby.account else [])
     return validated, serialized, persisted_accounts
@@ -373,7 +378,9 @@ async def list_emby_accounts(_: bool = Depends(require_auth)):
             "module_enabled": bool(cfg.emby.enabled) if cfg.emby and cfg.emby.enabled is not None else True,
             "concurrency": cfg.emby.concurrency if cfg.emby and cfg.emby.concurrency is not None else 1,
             "time_range": str(cfg.emby.time_range) if cfg.emby and cfg.emby.time_range is not None else None,
-            "interval_days": str(cfg.emby.interval_days) if cfg.emby and cfg.emby.interval_days is not None else None,
+            "interval_days": (
+                str(cfg.emby.interval_days) if cfg.emby and cfg.emby.interval_days is not None else None
+            ),
         }
         for a in accounts:
             status = _serialize_account(a)
@@ -401,7 +408,7 @@ async def save_emby_settings(payload: EmbySettingsPayload, _: bool = Depends(req
         merged["emby"] = emby_section
 
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True}
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=format_errors(e))
@@ -490,7 +497,7 @@ async def create_emby_account(payload: EmbyAccountPayload, _: bool = Depends(req
         accounts.append(account)
         merged = _replace_accounts(raw, accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True, "account": _serialize_account(account)}
     except HTTPException:
         raise
@@ -501,7 +508,9 @@ async def create_emby_account(payload: EmbyAccountPayload, _: bool = Depends(req
 
 
 @router.put("/emby/accounts")
-async def update_emby_account(key: str = Query(...), payload: EmbyAccountPayload = None, _: bool = Depends(require_auth)):
+async def update_emby_account(
+    key: str = Query(...), payload: EmbyAccountPayload = None, _: bool = Depends(require_auth)
+):
     try:
         _, raw, accounts = _load_emby_accounts()
         updated = False
@@ -511,8 +520,8 @@ async def update_emby_account(key: str = Query(...), payload: EmbyAccountPayload
         for account in accounts:
             if _account_key(account) == key:
                 payload_data = payload.model_dump(exclude_none=True)
-                if not payload_data.get('password'):
-                    payload_data['password'] = account.password
+                if not payload_data.get("password"):
+                    payload_data["password"] = account.password
                 next_account = EmbyAccount(id=_account_key(account), **payload_data)
                 next_accounts.append(next_account)
                 updated = True
@@ -522,12 +531,19 @@ async def update_emby_account(key: str = Query(...), payload: EmbyAccountPayload
         if not updated:
             raise HTTPException(status_code=404, detail="Emby account not found")
 
-        if sum(1 for account in next_accounts if _account_signature(account) == _account_signature(next_account)) > 1:
+        if (
+            sum(
+                1
+                for account in next_accounts
+                if _account_signature(account) == _account_signature(next_account)
+            )
+            > 1
+        ):
             raise HTTPException(status_code=409, detail="Emby account already exists")
 
         merged = _replace_accounts(raw, next_accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True, "account": _serialize_account(next_account)}
     except HTTPException:
         raise
@@ -548,7 +564,7 @@ async def delete_emby_account(key: str = Query(...), _: bool = Depends(require_a
 
         merged = _replace_accounts(raw, next_accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True}
     except HTTPException:
         raise

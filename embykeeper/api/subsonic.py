@@ -10,14 +10,13 @@ from .auth import require_auth
 from ..config import config as config_manager
 from ..schema import Config, SubsonicAccount, format_errors
 
-
 router = APIRouter()
 
 
 class SubsonicAccountPayload(BaseModel):
     url: str
     username: str
-    password: str = ''
+    password: str = ""
     name: Optional[str] = None
     enabled: bool = True
     use_proxy: bool = True
@@ -92,7 +91,9 @@ def _account_signature(account: SubsonicAccount) -> str:
     return f"{account.username}@{account.url}"
 
 
-def _ensure_subsonic_account_ids(model: Config, raw: Dict[str, Any], accounts: List[SubsonicAccount]) -> Tuple[Config, Dict[str, Any], List[SubsonicAccount]]:
+def _ensure_subsonic_account_ids(
+    model: Config, raw: Dict[str, Any], accounts: List[SubsonicAccount]
+) -> Tuple[Config, Dict[str, Any], List[SubsonicAccount]]:
     existing_ids = {_account_key(account) for account in accounts if _account_key(account)}
     normalized: List[SubsonicAccount] = []
     changed = False
@@ -112,9 +113,11 @@ def _ensure_subsonic_account_ids(model: Config, raw: Dict[str, Any], accounts: L
 
     merged = _replace_accounts(raw, normalized)
     validated = Config(**merged)
-    serialized = validated.model_dump(mode='json', exclude_none=True, exclude_unset=True)
+    serialized = validated.model_dump(mode="json", exclude_none=True, exclude_unset=True)
     _write_config_dict(serialized)
-    persisted_accounts = list(validated.subsonic.account if validated.subsonic and validated.subsonic.account else [])
+    persisted_accounts = list(
+        validated.subsonic.account if validated.subsonic and validated.subsonic.account else []
+    )
     return validated, serialized, persisted_accounts
 
 
@@ -134,10 +137,20 @@ async def list_subsonic_accounts(_: bool = Depends(require_auth)):
             "total": len(accounts),
             "enabled": 0,
             "use_proxy": 0,
-            "module_enabled": bool(cfg.subsonic.enabled) if cfg.subsonic and cfg.subsonic.enabled is not None else True,
-            "concurrency": cfg.subsonic.concurrency if cfg.subsonic and cfg.subsonic.concurrency is not None else 1,
-            "time_range": str(cfg.subsonic.time_range) if cfg.subsonic and cfg.subsonic.time_range is not None else None,
-            "interval_days": str(cfg.subsonic.interval_days) if cfg.subsonic and cfg.subsonic.interval_days is not None else None,
+            "module_enabled": (
+                bool(cfg.subsonic.enabled) if cfg.subsonic and cfg.subsonic.enabled is not None else True
+            ),
+            "concurrency": (
+                cfg.subsonic.concurrency if cfg.subsonic and cfg.subsonic.concurrency is not None else 1
+            ),
+            "time_range": (
+                str(cfg.subsonic.time_range) if cfg.subsonic and cfg.subsonic.time_range is not None else None
+            ),
+            "interval_days": (
+                str(cfg.subsonic.interval_days)
+                if cfg.subsonic and cfg.subsonic.interval_days is not None
+                else None
+            ),
         }
         for account in accounts:
             item = _serialize_account(account)
@@ -161,7 +174,7 @@ async def save_subsonic_settings(payload: SubsonicSettingsPayload, _: bool = Dep
         merged["subsonic"] = section
 
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True}
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=format_errors(exc))
@@ -190,11 +203,13 @@ async def create_subsonic_account(payload: SubsonicAccountPayload, _: bool = Dep
         if any(_account_signature(existing) == f"{payload.username}@{payload.url}" for existing in accounts):
             raise HTTPException(status_code=409, detail="Subsonic account already exists")
         existing_ids = {_account_key(existing) for existing in accounts if _account_key(existing)}
-        account = SubsonicAccount(id=_generate_account_id(existing_ids), **payload.model_dump(exclude_none=True))
+        account = SubsonicAccount(
+            id=_generate_account_id(existing_ids), **payload.model_dump(exclude_none=True)
+        )
         accounts.append(account)
         merged = _replace_accounts(raw, accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True, "account": _serialize_account(account)}
     except HTTPException:
         raise
@@ -205,7 +220,9 @@ async def create_subsonic_account(payload: SubsonicAccountPayload, _: bool = Dep
 
 
 @router.put("/subsonic/accounts")
-async def update_subsonic_account(key: str = Query(...), payload: SubsonicAccountPayload = None, _: bool = Depends(require_auth)):
+async def update_subsonic_account(
+    key: str = Query(...), payload: SubsonicAccountPayload = None, _: bool = Depends(require_auth)
+):
     try:
         _, raw, accounts = _load_subsonic_accounts()
         updated = False
@@ -214,8 +231,8 @@ async def update_subsonic_account(key: str = Query(...), payload: SubsonicAccoun
         for account in accounts:
             if _account_key(account) == key:
                 payload_data = payload.model_dump(exclude_none=True)
-                if not payload_data.get('password'):
-                    payload_data['password'] = account.password
+                if not payload_data.get("password"):
+                    payload_data["password"] = account.password
                 next_account = SubsonicAccount(id=_account_key(account), **payload_data)
                 next_accounts.append(next_account)
                 updated = True
@@ -223,11 +240,18 @@ async def update_subsonic_account(key: str = Query(...), payload: SubsonicAccoun
                 next_accounts.append(account)
         if not updated:
             raise HTTPException(status_code=404, detail="Subsonic account not found")
-        if sum(1 for account in next_accounts if _account_signature(account) == _account_signature(next_account)) > 1:
+        if (
+            sum(
+                1
+                for account in next_accounts
+                if _account_signature(account) == _account_signature(next_account)
+            )
+            > 1
+        ):
             raise HTTPException(status_code=409, detail="Subsonic account already exists")
         merged = _replace_accounts(raw, next_accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True, "account": _serialize_account(next_account)}
     except HTTPException:
         raise
@@ -246,7 +270,7 @@ async def delete_subsonic_account(key: str = Query(...), _: bool = Depends(requi
             raise HTTPException(status_code=404, detail="Subsonic account not found")
         merged = _replace_accounts(raw, next_accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True}
     except HTTPException:
         raise

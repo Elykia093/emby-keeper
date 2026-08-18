@@ -324,7 +324,9 @@ class EmbyManager:
     def get_spec(self, account: EmbyAccount):
         return f"{account.username}@{account.name or account.url.host}"
 
-    async def _watch_main(self, accounts: List[EmbyAccount], instant: bool = False, description: Optional[str] = None):
+    async def _watch_main(
+        self, accounts: List[EmbyAccount], instant: bool = False, description: Optional[str] = None
+    ):
         if not accounts:
             return None
 

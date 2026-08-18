@@ -156,7 +156,11 @@ class RegisterManager:
         return sites
 
     def schedule_account(self, account: TelegramAccount) -> bool:
-        if (not self._module_enabled()) or (not account.enabled) or (not getattr(account, "registrar", False)):
+        if (
+            (not self._module_enabled())
+            or (not account.enabled)
+            or (not getattr(account, "registrar", False))
+        ):
             return False
 
         self.stop_account(account.phone)

@@ -373,8 +373,7 @@ class Link:
     def _normalize_ai_content(content):
         if isinstance(content, list):
             content = "".join(
-                item.get("text", "") if isinstance(item, dict) else str(item)
-                for item in content
+                item.get("text", "") if isinstance(item, dict) else str(item) for item in content
             )
         return (content or "").strip()
 
@@ -481,10 +480,7 @@ class Link:
             return None, None
 
         option_lines = "\n".join(f"- {option}" for option in options)
-        prompt = (
-            "你在帮助 Telegram 签到验证码识别。"
-            "请根据图片内容，只从候选项中选择唯一正确的一项。"
-        )
+        prompt = "你在帮助 Telegram 签到验证码识别。" "请根据图片内容，只从候选项中选择唯一正确的一项。"
         if question:
             prompt += f"\n题目或提示: {question}"
         prompt += (
@@ -532,7 +528,7 @@ class Link:
         if not matched or matched[1] < 70:
             self.log.warning(
                 f'请求视觉问题解答失败: 返回答案 "{answer}" 无法匹配候选项 {options}, '
-                f'最佳匹配结果: {matched}.'
+                f"最佳匹配结果: {matched}."
             )
             return None, None
 

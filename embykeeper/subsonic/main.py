@@ -282,9 +282,7 @@ class SubsonicManager:
             return None
 
         def on_next_time(t):
-            logger.bind(log=True).info(
-                f"下一次 Subsonic 保活将在 {t.strftime('%m-%d %H:%M %p')} 进行."
-            )
+            logger.bind(log=True).info(f"下一次 Subsonic 保活将在 {t.strftime('%m-%d %H:%M %p')} 进行.")
 
         def func(ctx: RunContext):
             existing = self._tasks.pop("unified", None)

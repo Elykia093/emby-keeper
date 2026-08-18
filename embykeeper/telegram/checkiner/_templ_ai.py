@@ -50,8 +50,7 @@ class TemplateAICheckin(TemplateACheckin):
     llm_timeout = 60
     llm_button_match_threshold = 70
     llm_prompt = (
-        "你在帮助 Telegram 签到。请根据图片中的验证码、图案、文字或题目，"
-        "从候选按钮中选择唯一正确答案。"
+        "你在帮助 Telegram 签到。请根据图片中的验证码、图案、文字或题目，" "从候选按钮中选择唯一正确答案。"
     )
 
     _zhipu_client = None
@@ -187,7 +186,9 @@ class TemplateAICheckin(TemplateACheckin):
         if not options:
             return False
 
-        if self.templ_panel_keywords and any(keyword in text for keyword in to_iterable(self.templ_panel_keywords)):
+        if self.templ_panel_keywords and any(
+            keyword in text for keyword in to_iterable(self.templ_panel_keywords)
+        ):
             return False
 
         if any(any(btn in option for btn in to_iterable(self.bot_checkin_button)) for option in options):
@@ -271,8 +272,7 @@ class TemplateAICheckin(TemplateACheckin):
 
         if isinstance(content, list):
             content = "".join(
-                item.get("text", "") if isinstance(item, dict) else str(item)
-                for item in content
+                item.get("text", "") if isinstance(item, dict) else str(item) for item in content
             )
         self._last_llm_response_preview = (content or "").replace("\n", " ").strip()[:200] or "<empty>"
         answer = self.extract_answer(content)
@@ -312,9 +312,7 @@ class TemplateAICheckin(TemplateACheckin):
         if "{options}" in prompt:
             prompt = prompt.replace("{options}", option_lines)
         else:
-            prompt = (
-                f"{prompt}\n\n候选按钮如下，请只从这些候选项里选择:\n{option_lines}"
-            )
+            prompt = f"{prompt}\n\n候选按钮如下，请只从这些候选项里选择:\n{option_lines}"
         prompt += "\n\n只输出一行，格式必须为 [ANSWER]按钮原文[/ANSWER]。\n"
         prompt += "如果无法判断，请输出 [ANSWER][UNKNOWN][/ANSWER]。"
         return prompt
@@ -328,8 +326,7 @@ class TemplateAICheckin(TemplateACheckin):
     def extract_answer(self, content) -> Optional[str]:
         if isinstance(content, list):
             content = "".join(
-                item.get("text", "") if isinstance(item, dict) else str(item)
-                for item in content
+                item.get("text", "") if isinstance(item, dict) else str(item) for item in content
             )
         content = (content or "").strip()
         if not content:
@@ -408,7 +405,25 @@ class TemplateAICheckin(TemplateACheckin):
             to_iterable(self.bot_success_keywords),
         ]
         default_groups = [
-            ("拉黑", "黑名单", "冻结", "未找到用户", "无资格", "退出群", "退群", "加群", "加入群聊", "请先关注", "请先加入", "請先加入", "未注册", "先注册", "不存在", "不在群组中", "你有号吗"),
+            (
+                "拉黑",
+                "黑名单",
+                "冻结",
+                "未找到用户",
+                "无资格",
+                "退出群",
+                "退群",
+                "加群",
+                "加入群聊",
+                "请先关注",
+                "请先加入",
+                "請先加入",
+                "未注册",
+                "先注册",
+                "不存在",
+                "不在群组中",
+                "你有号吗",
+            ),
             ("已尝试", "过多"),
             ("只能", "已经", "过了", "签过", "明日再来", "重复签到", "已签到", "今日已签到"),
             ("失败", "错误", "超时"),
