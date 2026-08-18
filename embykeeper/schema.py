@@ -237,6 +237,16 @@ class BotConfig(ConfigModel):
     token: str
 
 
+class TurnstileConfig(ConfigModel):
+    """Cloudflare Turnstile 本地求解配置 (月饼 embyguard 等)."""
+
+    # 自建 turnsolve 地址; 支持逗号分隔多个, 失败自动换下一个
+    # 例: "http://127.0.0.1:8889,http://10.0.0.2:8889"
+    solver_url: Optional[str] = None
+    # YesCaptcha API Key; 设置后优先走 YesCaptcha, 不再请求 solver_url
+    yescaptcha_key: Optional[str] = None
+
+
 class Config(ConfigModel):
     alias_map: ClassVar[Dict[str, str]] = {
         "emby.time_range": "watchtime",
@@ -268,6 +278,7 @@ class Config(ConfigModel):
     telegram: Optional[TelegramConfig] = TelegramConfig()
     notifier: Optional[NotifierConfig] = NotifierConfig()
     site: Optional[SiteConfig] = None
+    turnstile: Optional[TurnstileConfig] = None
 
     # 向后兼容字段
     time: Optional[str] = None

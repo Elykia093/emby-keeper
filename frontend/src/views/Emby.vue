@@ -44,6 +44,25 @@ type EmbyDeviceCache = {
   useragent?: string | null
 }
 
+type EmbySummary = {
+  total: number
+  enabled: number
+  use_proxy: number
+  allow_stream: number
+  cf_challenge: number
+  concurrency: number
+  time_range: string
+  interval_days: string
+  module_enabled: boolean
+}
+
+type TimelineItem = {
+  time?: string
+  title: string
+  description?: string
+  type?: 'default' | 'success' | 'error' | 'warning'
+}
+
 type EmbyAccountItem = {
   id: string
   url: string
@@ -86,7 +105,7 @@ type EmbyForm = {
 
 const auth = useAuthStore()
 const accounts = ref<EmbyAccountItem[]>([])
-const summary = ref({ total: 0, enabled: 0, use_proxy: 0, allow_stream: 0, cf_challenge: 0, concurrency: 1, time_range: '', interval_days: '', module_enabled: true })
+const summary = ref<EmbySummary>({ total: 0, enabled: 0, use_proxy: 0, allow_stream: 0, cf_challenge: 0, concurrency: 1, time_range: '', interval_days: '', module_enabled: true })
 const loading = ref(true)
 const saving = ref(false)
 const moduleSaving = ref(false)
@@ -245,10 +264,6 @@ const formatRelativeTime = (value?: string | null) => {
   return formatAbsoluteTime(value)
 }
 
-const formatHistoryStatus = (status?: 'success' | 'failed') => {
-  return status === 'success' ? '成功' : '失败'
-}
-
 const formatDateTime = (value?: string | null) => {
   if (!value) return '-'
   const date = new Date(value)
@@ -275,7 +290,7 @@ const runStatusVariant = (status?: string | null) => {
 
 const isActiveRun = (status?: string | null) => ['PENDING', 'INITIALIZING', 'RUNNING'].includes(String(status || ''))
 
-const mapRunLogsToTimeline = (items: EmbyRunLog[]) => {
+const mapRunLogsToTimeline = (items: EmbyRunLog[]): TimelineItem[] => {
   return items.map((log) => ({
     time: formatDateTime(log.time),
     title: log.message,
@@ -338,7 +353,7 @@ const fetchAccounts = async () => {
   loading.value = true
   pageError.value = ''
   try {
-    const data = await auth.request('/emby/accounts')
+    const data = await auth.request<{ accounts: EmbyAccountItem[], summary: EmbySummary }>('/emby/accounts')
     accounts.value = data.accounts || []
     summary.value = data.summary || summary.value
   } catch (error) {
@@ -364,26 +379,6 @@ const saveEmbyModuleSetting = async (enabled: boolean) => {
     await fetchAccounts()
   } finally {
     moduleSaving.value = false
-  }
-}
-
-const buildAccountUpdatePayload = (account: EmbyAccountItem, enabled = account.enabled) => {
-  const time = Array.isArray(account.time) && account.time.length >= 2 ? account.time : [300, 600]
-
-  return {
-    url: account.url,
-    username: account.username,
-    password: '',
-    name: account.name || null,
-    enabled,
-    use_proxy: account.use_proxy,
-    allow_stream: account.allow_stream,
-    cf_challenge: account.cf_challenge,
-    allow_multiple: account.allow_multiple,
-    play_id: account.play_id || null,
-    time: [Number(time[0] || 300), Number(time[1] || 600)],
-    interval_days: account.interval_days || null,
-    time_range: account.time_range || null,
   }
 }
 
@@ -493,13 +488,13 @@ const syncTestLogsStream = () => {
 
 const fetchRunBundle = async (runId: string) => {
   const [runData, logData] = await Promise.all([
-    auth.request(`/runinfo/${runId}`),
-    auth.request(`/runinfo/${runId}/logs?limit=200&include_children=true`),
+    auth.request<{ run: EmbyRunItem }>(`/runinfo/${runId}`),
+    auth.request<{ logs: EmbyRunLog[] }>(`/runinfo/${runId}/logs?limit=200&include_children=true`),
   ])
 
   return {
-    run: runData.run as EmbyRunItem,
-    logs: (logData.logs || []) as EmbyRunLog[],
+    run: runData.run,
+    logs: logData.logs || [],
   }
 }
 
@@ -512,9 +507,9 @@ const refreshCurrentAccount = async (preferredRunId?: string) => {
 
   try {
     const [accountData, runsData, deviceData] = await Promise.all([
-      auth.request(`/emby/accounts/detail?key=${encodedKey}`),
-      auth.request(`/emby/accounts/runs?key=${encodedKey}&limit=20`),
-      auth.request(`/emby/accounts/device?key=${encodedKey}`),
+      auth.request<{ account: EmbyAccountItem }>(`/emby/accounts/detail?key=${encodedKey}`),
+      auth.request<{ runs: EmbyRunItem[] }>(`/emby/accounts/runs?key=${encodedKey}&limit=20`),
+      auth.request<{ device: EmbyDeviceCache | null }>(`/emby/accounts/device?key=${encodedKey}`),
     ])
 
     currentAccount.value = {
@@ -523,7 +518,7 @@ const refreshCurrentAccount = async (preferredRunId?: string) => {
       device_cache: deviceData.device || null,
     }
 
-    const nextRunId = preferredRunId || selectedRunId.value || currentAccount.value.run_history?.[0]?.id
+    const nextRunId = preferredRunId || selectedRunId.value || runsData.runs?.[0]?.id
     if (nextRunId) {
       await loadRunDetail(nextRunId)
     } else {
@@ -562,8 +557,8 @@ const refreshTestRun = async (silent = false) => {
   }
 
   try {
-    const runData = await auth.request(`/runinfo/${testRunId.value}`)
-    testRun.value = runData.run as EmbyRunItem
+    const runData = await auth.request<{ run: EmbyRunItem }>(`/runinfo/${testRunId.value}`)
+    testRun.value = runData.run
 
     if (!isActiveRun(testRun.value?.status)) {
       stopTestPolling()
@@ -598,7 +593,7 @@ const openDetailDrawer = async (account: EmbyAccountItem) => {
   pageError.value = ''
 
   try {
-    const data = await auth.request(`/emby/accounts/detail?key=${encodeURIComponent(accountKey(account))}`)
+    const data = await auth.request<{ account: EmbyAccountItem }>(`/emby/accounts/detail?key=${encodeURIComponent(accountKey(account))}`)
     currentAccount.value = data.account
     if (currentAccount.value?.run_history?.[0]?.id) {
       await loadRunDetail(currentAccount.value.run_history[0].id)
@@ -621,7 +616,7 @@ const startAccountTestRun = async () => {
 
   try {
     const encodedKey = encodeURIComponent(currentAccountKey.value)
-    const data = await auth.request(`/emby/accounts/test-run?key=${encodedKey}`, { method: 'POST' })
+    const data = await auth.request<{ success: boolean, run_id: string | null }>(`/emby/accounts/test-run?key=${encodedKey}`, { method: 'POST' })
     testRunId.value = data.run_id || ''
 
     if (!testRunId.value) {

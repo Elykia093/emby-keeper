@@ -6,21 +6,21 @@ if not %errorlevel% == 0 (
     (((echo.%cmdcmdline%)|find /I "%~0")>nul) && pause
     exit /b 1
 )
-if not exist "%~dp0/python-*-embed-*" (
+if not exist "%~dp0/python-3.12.10-embed-amd64" (
     echo **************************************************
     echo *            请等待, 正在下载 Embykeeper         *
     echo **************************************************
     powershell Unblock-File -Path '%~dp0downloaders\download_python.ps1'
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_python.ps1" -Version 3.8.10 -TargetDirectory "." || goto :error
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_pip.ps1" -TargetDirectory "python-3.8.10-embed-amd64" || goto :error
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_deps.ps1" -RequirementsFile "%~dp0script\requirements.txt" -PythonPath "%~dp0python-3.8.10-embed-amd64\python.exe" -NoMirror || goto :error
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_python.ps1" -Version 3.12.10 -TargetDirectory "." || goto :error
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_pip.ps1" -TargetDirectory "python-3.12.10-embed-amd64" || goto :error
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_deps.ps1" -RequirementsFile "%~dp0script\requirements.txt" -PythonPath "%~dp0python-3.12.10-embed-amd64\python.exe" -NoMirror || goto :error
     xcopy /y "%~dp0script\Update.bat" "%~dp0"
     echo **************************************************
     echo 安装完成! 即将启动 Embykeeper.
     timeout /t 2 /nobreak > NUL
     cls
 )
-"%~dp0/python-3.8.10-embed-amd64/python.exe" "script\cli.py" -i
+"%~dp0/python-3.12.10-embed-amd64/python.exe" "script\cli.py" -i
 echo.
 (((echo.%cmdcmdline%)|find /I "%~0")>nul) && echo | set /p="Embykeeper 已结束, 请按任意键退出..." & pause>nul
 

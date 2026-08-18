@@ -176,7 +176,7 @@ concurrency = 1
 
 # 默认启用站点:
 # [site]
-# checkiner = ["awatv", "cc", "dpeak", "dvfilm", "epub", "feiyue", "feiyuedpx", "future", "ikunmusic", "jingzhe", "jsq", "kiku", "lemby", "lyrebird", "meow", "micu", "misty", "mooncake", "mooncake_ai", "moyunge", "nangua", "nebula", "pandatv", "pandatv_group", "peach", "pilipili", "plumber", "ruji", "rujing", "saturday", "sfcju", "shufu", "tanhua", "tdck", "tdck_new", "terminus", "tiannanus", "worldline", "xigua", "xigua_old", "yezi", "yezigm", "yomo", "zm"]
+# checkiner = ["awatv", "cc", "dpeak", "dvfilm", "epub", "feiyue", "feiyuedpx", "future", "ikunmusic", "jingzhe", "jsq", "kiku", "lemby", "lyrebird", "meow", "micu", "misty", "mooncake", "moyunge", "nangua", "nebula", "pandatv", "pandatv_group", "peach", "pilipili", "plumber", "ruji", "rujing", "saturday", "sfcju", "shufu", "tanhua", "tdck", "tdck_new", "terminus", "tiannanus", "worldline", "xigua", "xigua_old", "yezi", "yezigm", "yomo", "zm"]
 # monitor = ["bgk", "future", "infinity_fly", "misty", "pornfans_answer", "pornfans_double", "pornfans_dragon_rain", "pornfans_exam", "pornfans_nohp", "viper", "woke"]
 # messager = []
 # registrar = []
@@ -198,6 +198,18 @@ concurrency = 1
 # hostname = "127.0.0.1"
 # port = 1080
 # scheme = "socks5" # 可选: http / socks5
+
+# ================================================================================
+# Cloudflare Turnstile 求解 (可选)
+# 月饼 embyguard 等站点需要
+# 优先级: 环境变量 (SOLVER_URL, YESCAPTCHA_KEY) > 本配置 > 默认 127.0.0.1:8889
+# ================================================================================
+
+# [turnstile]
+# 自建 turnsolve 地址; 多个用逗号分隔, 失败自动换下一个:
+# solver_url = "http://127.0.0.1:8889,http://10.0.0.2:8889"
+# YesCaptcha API Key (设置后优先走 YesCaptcha, 不再请求 solver_url):
+# yescaptcha_key = ""
 
 # ================================================================================
 # 日志推送相关设置

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "vue-tsc --noEmit",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.4.5",
-    "vite": "^5.2.8"
+    "vite": "^5.2.8",
+    "vue-tsc": "2.0.29"
   }
 }

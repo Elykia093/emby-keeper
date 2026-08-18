@@ -17,12 +17,19 @@ export interface RunLogEntry {
 
 export interface RunSummary {
   id: string
-  description?: string
+  parent_ids?: string[]
+  description?: string | null
   status: string
-  status_info?: string
-  start_time?: string
-  end_time?: string
-  parent_id?: string | null
+  status_code?: number | null
+  status_info?: string | null
+  duration?: number | null
+  start_time?: string | null
+  end_time?: string | null
+  next_time?: string | null
+  reschedule?: boolean
+  has_next_time?: boolean
+  is_reschedule?: boolean
+  child_count?: number
 }
 
 export interface RunDetail {

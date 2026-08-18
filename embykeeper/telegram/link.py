@@ -418,7 +418,7 @@ class Link:
         try:
             client = self._get_zhipu_client(api_key)
         except ImportError:
-            self.log.warning("请求智能回答失败: 未安装 zai-sdk, 请先安装 `zai-sdk==0.2.2`.")
+            self.log.warning("请求智能回答失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
             return None, None
         except Exception as e:
             self.log.warning(f"请求智能回答失败: 初始化智谱客户端失败: {e}.")
@@ -468,7 +468,7 @@ class Link:
         try:
             client = self._get_zhipu_client(api_key)
         except ImportError:
-            self.log.warning("请求视觉问题解答失败: 未安装 zai-sdk, 请先安装 `zai-sdk==0.2.2`.")
+            self.log.warning("请求视觉问题解答失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
             return None, None
         except Exception as e:
             self.log.warning(f"请求视觉问题解答失败: 初始化智谱客户端失败: {e}.")

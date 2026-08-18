@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { ChartBarIcon, CheckCircleIcon, ChevronLeftIcon, ClockIcon, ExclamationTriangleIcon, PlayIcon , MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
+import { ChartBarIcon, CheckCircleIcon, ExclamationTriangleIcon, PlayIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiCard from '@/components/ui/UiCard.vue'
@@ -35,19 +35,6 @@ const ACTIVE_STATUSES = new Set(['PENDING', 'INITIALIZING', 'RUNNING'])
 
 const currentRun = computed(() => selectedChild.value?.run || detail.value?.run || null)
 const currentLogs = computed(() => selectedChild.value ? childLogs.value : logs.value)
-const breadcrumbItems = computed(() => {
-  const items = []
-
-  if (detail.value?.run) {
-    items.push({ id: detail.value.run.id, label: detail.value.run.description || detail.value.run.id, isChild: false })
-  }
-
-  if (selectedChild.value?.run) {
-    items.push({ id: selectedChild.value.run.id, label: selectedChild.value.run.description || selectedChild.value.run.id, isChild: true })
-  }
-
-  return items
-})
 const filteredRuns = computed(() => {
   const keyword = search.value.trim().toLowerCase()
   if (!keyword) {
@@ -168,11 +155,6 @@ const openChildDetail = async (childId: string) => {
   }
 }
 
-const backToParent = () => {
-  selectedChild.value = null
-  childLogs.value = []
-}
-
 const cancelRun = async (id: string) => {
   actionLoading.value = id
 
@@ -205,7 +187,7 @@ const cancelAll = async () => {
   }
 }
 
-const getStatusVariant = (s: string) => {
+const getStatusVariant = (s?: string | null) => {
   if (s === 'SUCCESS') return 'success'
   if (s === 'ERROR' || s === 'FAILED' || s === 'FAIL') return 'error'
   if (s === 'RUNNING') return 'info'

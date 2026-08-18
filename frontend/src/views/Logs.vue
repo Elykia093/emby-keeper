@@ -7,7 +7,7 @@ import UiButton from '@/components/ui/UiButton.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSSE } from '@/composables/useSSE'
 import type { RunLogEntry } from '@/types'
-import { LOG_PAGE_LIMIT, LOG_MAX_IN_MEMORY, SSE_RECONNECT_SHORT_MS } from '@/utils/constants'
+import { LOG_PAGE_LIMIT, LOG_MAX_IN_MEMORY } from '@/utils/constants'
 import { dedupedPrepend } from '@/utils/logDedup'
 import { logger } from '@/utils/logger'
 

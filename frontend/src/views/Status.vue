@@ -63,7 +63,6 @@ const activeTerminalLines = computed<string[]>(() => {
 
   return [...backendOutput.value, ...businessLogLines.value]
 })
-const backendExitCode = computed(() => backend.value?.exit_code)
 const coloredTerminalHtml = computed(() => {
   const escapeHtml = (value: string) => value
     .replace(/&/g, '&amp;')
@@ -153,7 +152,7 @@ const syncBusinessLogsStream = () => {
   }
 }
 
-const { connect: connectStatusStream, disconnect: disconnectStatusStream } = useSSE(statusEndpoint, {
+const { connect: connectStatusStream, disconnect: disconnectStatusStream } = useSSE<BackendStatus>(statusEndpoint, {
   onEvent: (event) => {
     if (event.type !== 'status') return
     const previousLogCount = backendOutput.value.length
@@ -179,7 +178,7 @@ const {
   isConnected: businessLogsConnected,
   connect: connectBusinessLogsStream,
   disconnect: disconnectBusinessLogsStream,
-} = useSSE(businessLogsEndpoint, {
+} = useSSE<LogEntryLike>(businessLogsEndpoint, {
   onEvent: (event) => {
     if (event.type !== 'message') return
     appendBusinessLog(event.data)

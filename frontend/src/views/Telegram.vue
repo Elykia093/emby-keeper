@@ -41,9 +41,23 @@ type TelegramForm = {
   session: string
 }
 
+type TelegramSummary = {
+  total: number
+  enabled: number
+  checkiner: number
+  monitor: number
+  messager: number
+  registrar: number
+  use_proxy: boolean
+  checkiner_enabled: boolean
+  monitor_enabled: boolean
+  messager_enabled: boolean
+  registrar_enabled: boolean
+}
+
 const auth = useAuthStore()
 const accounts = ref<TelegramAccountItem[]>([])
-const summary = ref({
+const summary = ref<TelegramSummary>({
   total: 0,
   enabled: 0,
   checkiner: 0,
@@ -161,7 +175,7 @@ const fetchAccounts = async () => {
   loading.value = true
   pageError.value = ''
   try {
-    const data = await auth.request('/telegram/accounts')
+    const data = await auth.request<{ accounts: TelegramAccountItem[], summary: TelegramSummary }>('/telegram/accounts')
     accounts.value = data.accounts || []
     summary.value = data.summary || summary.value
   } catch (error) {
@@ -222,7 +236,7 @@ const openEditDrawer = (account: TelegramAccountItem) => {
 const openDetailDrawer = async (account: TelegramAccountItem) => {
   pageError.value = ''
   try {
-    const data = await auth.request(`/telegram/accounts/${encodeURIComponent(account.phone)}`)
+    const data = await auth.request<{ account: TelegramAccountItem }>(`/telegram/accounts/${encodeURIComponent(account.phone)}`)
     currentAccount.value = data.account
     detailOpen.value = true
   } catch (error) {

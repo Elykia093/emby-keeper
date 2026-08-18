@@ -8,10 +8,11 @@ import Emby from './views/Emby.vue'
 import Subsonic from './views/Subsonic.vue'
 import Runinfo from './views/Runinfo.vue'
 import Settings from './views/Settings.vue'
+import { AUTH_CACHE_TTL_MS } from './utils/constants'
 
 const router = createRouter({
   history: createWebHistory(),
-  scrollBehavior(to, from, savedPosition) {
+  scrollBehavior(to, _from, savedPosition) {
     if (savedPosition) {
       return savedPosition
     }
@@ -41,15 +42,17 @@ const router = createRouter({
 
 // Cache auth result within a short window to avoid redundant /api/auth/me calls
 let authCache: { valid: boolean; ts: number } | null = null
-const AUTH_CACHE_TTL = 10_000
-
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore()
 
   if (to.path === '/login') {
     authCache = null
     const isValid = await auth.checkAuth()
-    next(isValid ? '/status' : undefined)
+    if (isValid) {
+      next('/status')
+    } else {
+      next()
+    }
     return
   }
 
@@ -59,12 +62,20 @@ router.beforeEach(async (to, from, next) => {
   }
 
   const now = Date.now()
-  if (!authCache || now - authCache.ts > AUTH_CACHE_TTL) {
+  if (!authCache || now - authCache.ts > AUTH_CACHE_TTL_MS) {
     const isValid = await auth.checkAuth()
     authCache = { valid: isValid, ts: now }
-    next(isValid ? undefined : '/login')
+    if (isValid) {
+      next()
+    } else {
+      next('/login')
+    }
   } else {
-    next(authCache.valid ? undefined : '/login')
+    if (authCache.valid) {
+      next()
+    } else {
+      next('/login')
+    }
   }
 })
 

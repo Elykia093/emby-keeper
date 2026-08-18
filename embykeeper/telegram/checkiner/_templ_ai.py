@@ -260,7 +260,7 @@ class TemplateAICheckin(TemplateACheckin):
         try:
             content = await asyncio.wait_for(to_thread_compat(run_request), timeout=self.llm_timeout)
         except ImportError:
-            self.log.warning("签到失败: 未安装 zai-sdk, 请先安装 `zai-sdk==0.2.2`.")
+            self.log.warning("签到失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
             return None
         except asyncio.TimeoutError:
             self.log.warning("签到失败: 图像模型请求超时.")
@@ -298,7 +298,7 @@ class TemplateAICheckin(TemplateACheckin):
         try:
             from zai import ZhipuAiClient
         except ImportError:
-            self.log.warning("签到失败: 未安装 zai-sdk, 请先安装 `zai-sdk==0.2.2`.")
+            self.log.warning("签到失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
             return None
 
         self.__class__._zhipu_client = ZhipuAiClient(api_key=api_key)

@@ -2,7 +2,6 @@
 import { computed, reactive, ref } from 'vue'
 import {
   CheckCircleIcon,
-  Cog6ToothIcon,
   InformationCircleIcon,
 } from '@heroicons/vue/24/outline'
 import UiButton from '@/components/ui/UiButton.vue'

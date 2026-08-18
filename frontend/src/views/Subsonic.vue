@@ -38,9 +38,19 @@ type SubsonicForm = {
   time_range: string
 }
 
+type SubsonicSummary = {
+  total: number
+  enabled: number
+  use_proxy: number
+  concurrency: number
+  time_range: string | null
+  interval_days: string | null
+  module_enabled: boolean
+}
+
 const auth = useAuthStore()
 const accounts = ref<SubsonicAccountItem[]>([])
-const summary = ref({ total: 0, enabled: 0, use_proxy: 0, concurrency: 1, time_range: '', interval_days: '', module_enabled: true })
+const summary = ref<SubsonicSummary>({ total: 0, enabled: 0, use_proxy: 0, concurrency: 1, time_range: '', interval_days: '', module_enabled: true })
 const loading = ref(true)
 const saving = ref(false)
 const moduleSaving = ref(false)
@@ -137,7 +147,7 @@ const fetchAccounts = async () => {
   loading.value = true
   pageError.value = ''
   try {
-    const data = await auth.request('/subsonic/accounts')
+    const data = await auth.request<{ accounts: SubsonicAccountItem[], summary: SubsonicSummary }>('/subsonic/accounts')
     accounts.value = data.accounts || []
     summary.value = data.summary || summary.value
   } catch (error) {
@@ -185,7 +195,7 @@ const openEditDrawer = (account: SubsonicAccountItem) => {
 const openDetailDrawer = async (account: SubsonicAccountItem) => {
   pageError.value = ''
   try {
-    const data = await auth.request(`/subsonic/accounts/detail?key=${encodeURIComponent(accountKey(account))}`)
+    const data = await auth.request<{ account: SubsonicAccountItem }>(`/subsonic/accounts/detail?key=${encodeURIComponent(accountKey(account))}`)
     currentAccount.value = data.account
     detailOpen.value = true
   } catch (error) {
