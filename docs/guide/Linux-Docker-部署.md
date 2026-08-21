@@ -5,7 +5,7 @@
 Embykeeper 可以通过 `docker` 部署, 您需 [安装 docker](https://yeasy.gitbook.io/docker_practice/install), 然后执行:
 
 ```bash
-docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper
+docker run -v $(pwd)/embykeeper:/app --rm -it --net=host elykia093/emby-keeper
 ```
 
 ::: tip 说明
@@ -19,7 +19,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper
 随后, 再次执行命令:
 
 ```bash
-docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -i
+docker run -v $(pwd)/embykeeper:/app --rm -it --net=host elykia093/emby-keeper -i
 ```
 
 ::: info 注意
@@ -27,7 +27,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
 命令行中的 `-i` 指: 启动后立刻运行一次签到和保活, 如果您需要频繁多次运行, 请去掉该命令行参数运行:
 
 ```bash
-docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper
+docker run -v $(pwd)/embykeeper:/app --rm -it --net=host elykia093/emby-keeper
 ```
 
 :::
@@ -65,21 +65,21 @@ tmux a
 当您需要更新版本时, 您需要按 `Ctrl + C` 停止现有程序, 然后执行:
 
 ```bash
-docker pull embykeeper/embykeeper
+docker pull elykia093/emby-keeper
 ```
 
 然后重新运行:
 
 ```bash
-docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -i
+docker run -v $(pwd)/embykeeper:/app --rm -it --net=host elykia093/emby-keeper -i
 ```
 
 ## 使用其他版本
 
-当您需要使用旧版本 (例如`v1.1.1`) 时, 您可以在镜像名后追加版本号:
+当您需要使用旧版本 (例如`v7.6.3`) 时, 您可以在镜像名后追加版本号:
 
 ```bash
-docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper:v1.1.1 -i
+docker run -v $(pwd)/embykeeper:/app --rm -it --net=host elykia093/emby-keeper:v7.6.3 -i
 ```
 
 ## 命令行参数
@@ -91,7 +91,7 @@ Embykeeper 支持多样化的 [**⌨️ 命令行参数**](/guide/命令行参�
 当通过 Docker 部署时, 末尾的所有参数将被传递给 Embykeeper, 例如:
 
 ```bash
-docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -e
+docker run -v $(pwd)/embykeeper:/app --rm -it --net=host elykia093/emby-keeper -e
 ```
 
 <!-- #endregion command -->
@@ -103,7 +103,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
 Embykeeper 提供 `dev` 系列镜像, 您可以运行:
 
 ```bash
-docker run -v $(pwd)/embykeeper-src:/src -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper:main-dev -i
+docker run -v $(pwd)/embykeeper-src:/src -v $(pwd)/embykeeper:/app --rm -it --net=host elykia093/emby-keeper:main-dev -i
 ```
 
 这将在 `./embykeeper-src` 目录挂载源码, `./embykeeper` 目录挂载数据.

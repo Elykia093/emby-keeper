@@ -363,6 +363,46 @@ class Client(pyrogram.Client):
         self.dispatcher: Dispatcher = Dispatcher(self)
 
         self.stop_handlers = []
+        self._stopping = False
+        self._session_lifecycle_lock = asyncio.Lock()
+
+    def _guard_session_restart(self, session):
+        if getattr(session, "_embykeeper_restart_guarded", False):
+            return session
+
+        async def restart():
+            async with self._session_lifecycle_lock:
+                if self._stopping:
+                    return
+
+                if session.stored_msg_ids:
+                    session.recent_msg_ids = session.stored_msg_ids[:30]
+
+                await session.stop()
+                if self._stopping:
+                    return
+                await session.start()
+
+        session.restart = restart
+        session._embykeeper_restart_guarded = True
+        return session
+
+    async def get_session(self, *args, **kwargs):
+        session = await super().get_session(*args, **kwargs)
+        return self._guard_session_restart(session)
+
+    async def start(self, *args, **kwargs):
+        self._stopping = False
+        try:
+            return await super().start(*args, **kwargs)
+        except BaseException:
+            self._stopping = True
+            raise
+
+    async def stop(self, *args, **kwargs):
+        self._stopping = True
+        async with self._session_lifecycle_lock:
+            return await super().stop(*args, **kwargs)
 
     async def authorize(self):
         if self.bot_token:
@@ -574,8 +614,15 @@ class Client(pyrogram.Client):
     async def handle_updates(self, updates):
         try:
             return await super().handle_updates(updates)
+        except TimeoutError as e:
+            if 'Failed to invoke "updates.GetChannelDifference"' not in str(e):
+                raise
+            logger.warning(f"与 Telegram 服务器连接错误: {e}")
+            return
         except OSError as e:
             logger.warning(f"与 Telegram 服务器连接错误: {e}")
+            if self._stopping:
+                return
             raise
         except sqlite3.ProgrammingError:
             return

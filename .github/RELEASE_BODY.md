@@ -1,9 +1,7 @@
 ## What's Changed
 
-1. 继承上游发布线至 `v7.6.2`，并合入后续发布流程修复。
-2. 将运行、测试、Docker 与 Windows 安装基线统一到 Python 3.12。
-3. 使用智谱 AI 接管智能问答与图片验证码识别，依赖范围为 `zai-sdk>=0.2.2`。
-4. 更新月饼 Turnstile 签到流程，并补充 Kotomi、Mambo 与 Emby 保活回归覆盖。
-5. Docker 镜像统一发布到 `elykia093/emby-keeper`，保留 Apprise Telegram Bot API 反代配置。
+1. 修复 Telegram 客户端 session 生命周期竞争问题，停止期间不再重启已关闭的 session。
+2. 处理 `updates.GetChannelDifference` 超时，避免后台更新任务产生未处理异常。
+3. 同步 Docker 部署文档与 `elykia093/emby-keeper` 镜像命名，并补充仓库维护规范文档。
 
-**Full Changelog**: https://github.com/Elykia093/emby-keeper/compare/v7.6.2...v7.6.3
+**Full Changelog**: https://github.com/Elykia093/emby-keeper/compare/v7.6.3...v7.6.4

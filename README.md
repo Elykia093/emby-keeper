@@ -22,6 +22,9 @@
 - 更新 v7.6.3 发布流程，修复手动发布时的 Windows 制品上传，补充 NSIS 安装，并限制 PyPI 发布仅在上游仓库执行。
 - 相比 v7.6.2，运行与构建环境统一升级到 Python 3.12：Docker 使用 3.12.14，Windows 安装器使用 3.12.10，CI / tox 使用 Python 3.12。
 - 智谱 AI 依赖由固定 `zai-sdk==0.2.2` 调整为 `zai-sdk>=0.2.2`，并补充 Turnstile HTTP 客户端依赖。
+- 修复 Telegram 客户端 session 生命周期竞争：停止过程中不再重启已关闭的 session，程序退出、账号热更新和代理切换时不再残留已断开的连接。
+- 修复 Telegram 后台更新任务的未处理异常：`updates.GetChannelDifference` 超时降级为可诊断警告，日志中不再出现 `Task exception was never retrieved`，其他连接错误仍按原有方式抛出。
+- 相比 v7.6.3，同步 README 与 Docker 部署文档中的镜像名为 `elykia093/emby-keeper`，旧版本示例改用实际存在的 `v7.6.3` 标签，按文档命令可直接拉取到正确镜像。
 
 [![build status](https://img.shields.io/github/actions/workflow/status/emby-keeper/emby-keeper/ci.yml?branch=main)](https://github.com/emby-keeper/emby-keeper/commits/main) [![pypi badge](https://img.shields.io/pypi/v/embykeeper)](https://pypi.org/project/embykeeper/) [![docker](https://img.shields.io/docker/v/elykia093/emby-keeper?label=docker)](https://hub.docker.com/r/elykia093/emby-keeper) [![docker pulls](https://img.shields.io/docker/pulls/elykia093/emby-keeper?label=pulls)](https://hub.docker.com/r/elykia093/emby-keeper) [![license badge](https://img.shields.io/github/license/emby-keeper/emby-keeper)](https://github.com/emby-keeper/emby-keeper/blob/main/LICENSE) [![telegram badge](https://img.shields.io/badge/telegram-bot-blue)](https://t.me/embykeeper_bot) [![telegram badge](https://img.shields.io/badge/telegram-channel-green)](https://t.me/embykeeper) [![telegram badge](https://img.shields.io/badge/telegram-group-violet)](https://t.me/embykeeperchat)
 
@@ -79,7 +82,7 @@ Embykeeper 支持 Docker 或 PyPI 安装 (Linux / Windows), 也支持云部署, 
 若您有服务器, 我们推荐使用 [Docker 部署](https://emby-keeper.github.io/guide/Linux-Docker-部署):
 
 ```bash
-docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -i
+docker run -v $(pwd)/embykeeper:/app --rm -it --net=host elykia093/emby-keeper -i
 ```
 
 **注意**: 由于近期 Telegram 风控等级上升, 请尽可能先使用服务器所在地区的代理在手机上先登陆一次, 再使用 Embykeeper.
