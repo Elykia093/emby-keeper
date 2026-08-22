@@ -25,6 +25,9 @@
 - 修复 Telegram 客户端 session 生命周期竞争：停止过程中不再重启已关闭的 session，程序退出、账号热更新和代理切换时不再残留已断开的连接。
 - 修复 Telegram 后台更新任务的未处理异常：`updates.GetChannelDifference` 超时降级为可诊断警告，日志中不再出现 `Task exception was never retrieved`，其他连接错误仍按原有方式抛出。
 - 相比 v7.6.3，同步 README 与 Docker 部署文档中的镜像名为 `elykia093/emby-keeper`，旧版本示例改用实际存在的 `v7.6.3` 标签，按文档命令可直接拉取到正确镜像。
+- 新增 AI 识别多后端回退：`[checkiner.ai]` 支持 `fallbacks` 与 `base_url`，主后端被内容审核拦截或请求失败时自动切换到备用模型或 OpenAI 兼容服务商，仅配置 `api_key` 的原有配置行为不变。
+- 优化 AI 请求失败日志：内容审核拦截会单独提示并显示当前后端序号与模型名，可与请求超时、网络错误区分。
+- 调整视觉识别提示词：移除固定开场白，支持通过 `[checkiner.ai].llm_prompt` 自定义，未配置时使用内置默认值。
 
 [![build status](https://img.shields.io/github/actions/workflow/status/emby-keeper/emby-keeper/ci.yml?branch=main)](https://github.com/emby-keeper/emby-keeper/commits/main) [![pypi badge](https://img.shields.io/pypi/v/embykeeper)](https://pypi.org/project/embykeeper/) [![docker](https://img.shields.io/docker/v/elykia093/emby-keeper?label=docker)](https://hub.docker.com/r/elykia093/emby-keeper) [![docker pulls](https://img.shields.io/docker/pulls/elykia093/emby-keeper?label=pulls)](https://hub.docker.com/r/elykia093/emby-keeper) [![license badge](https://img.shields.io/github/license/emby-keeper/emby-keeper)](https://github.com/emby-keeper/emby-keeper/blob/main/LICENSE) [![telegram badge](https://img.shields.io/badge/telegram-bot-blue)](https://t.me/embykeeper_bot) [![telegram badge](https://img.shields.io/badge/telegram-channel-green)](https://t.me/embykeeper) [![telegram badge](https://img.shields.io/badge/telegram-group-violet)](https://t.me/embykeeperchat)
 

@@ -34,8 +34,7 @@ class Link:
 
     bot = "embykeeper_auth_bot"
     post_count = 0
-    _zhipu_client = None
-    _zhipu_api_key = None
+    _zhipu_clients = {}
 
     def __init__(self, client: Client):
         self.client = client
@@ -338,18 +337,32 @@ class Link:
             return None, None
 
     async def gpt(self, prompt: str) -> Tuple[Optional[str], Optional[str]]:
-        """向机器人发送智能回答请求."""
-        ai_config = self._get_local_ai_config()
-        api_key = ai_config.get("api_key")
-        if api_key:
-            return await self._local_gpt(
-                prompt,
-                api_key=api_key,
-                model_id=ai_config.get("model_id") or "glm-4.1v-thinking-flashx",
-                timeout=ai_config.get("llm_timeout", 40),
-            )
+        """向机器人发送智能回答请求, 主后端失败时依次回退备用后端."""
+        backends = self._build_ai_backends(self._get_local_ai_config())
+        if not backends:
+            self.log.warning("请求智能回答失败: 未设置本地智谱 AI 配置 `[checkiner.ai].api_key`.")
+            return None, None
 
-        self.log.warning("请求智能回答失败: 未设置本地智谱 AI 配置 `[checkiner.ai].api_key`.")
+        for index, backend in enumerate(backends):
+            content = await self._request_ai_backend(
+                backend,
+                [{"role": "user", "content": prompt}],
+                name="智能回答",
+                attempt=(index + 1, len(backends)),
+            )
+            if content is None:
+                continue
+
+            answer = self._strip_think_content(self._normalize_ai_content(content))
+            if not answer:
+                self.log.warning(
+                    f"请求智能回答失败: 仅返回思维链或空内容, 原始响应预览: {self._preview_ai_content(content)}."
+                )
+                continue
+
+            self.log.info("服务请求完成: 请求智能回答")
+            return answer, f"zhipu:{backend['model_id']}"
+
         return None, None
 
     def _get_local_ai_config(self):
@@ -359,15 +372,51 @@ class Link:
         return {}
 
     @classmethod
-    def _get_zhipu_client(cls, api_key: str):
-        if cls._zhipu_client and cls._zhipu_api_key == api_key:
-            return cls._zhipu_client
+    def _get_zhipu_client(cls, api_key: str, base_url: str = None):
+        cache_key = (api_key, base_url or "")
+        if cache_key in cls._zhipu_clients:
+            return cls._zhipu_clients[cache_key]
 
         from zai import ZhipuAiClient
 
-        cls._zhipu_client = ZhipuAiClient(api_key=api_key)
-        cls._zhipu_api_key = api_key
-        return cls._zhipu_client
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        client = ZhipuAiClient(**kwargs)
+        cls._zhipu_clients[cache_key] = client
+        return client
+
+    @staticmethod
+    def _is_content_filter_error(error) -> bool:
+        """判断异常是否为服务商内容审核拦截, 这类失败重试同一后端没有意义."""
+        text = str(error)
+        return "contentFilter" in text or '"1301"' in text or ("敏感" in text and "内容" in text)
+
+    def _build_ai_backends(self, ai_config: dict) -> List[dict]:
+        """展开主后端与 fallbacks, 未指定的字段继承主后端."""
+        primary = {
+            "api_key": ai_config.get("api_key"),
+            "base_url": ai_config.get("base_url"),
+            "model_id": ai_config.get("model_id") or "glm-4.1v-thinking-flashx",
+            "timeout": ai_config.get("llm_timeout", 40),
+            "prompt": ai_config.get("llm_prompt"),
+        }
+        backends = [primary]
+        for entry in ai_config.get("fallbacks") or []:
+            if not isinstance(entry, dict):
+                continue
+            backend = dict(primary)
+            for key, alias in (
+                ("api_key", "api_key"),
+                ("base_url", "base_url"),
+                ("model_id", "model_id"),
+                ("timeout", "llm_timeout"),
+                ("prompt", "llm_prompt"),
+            ):
+                if entry.get(alias) is not None:
+                    backend[key] = entry[alias]
+            backends.append(backend)
+        return [b for b in backends if b["api_key"]]
 
     @staticmethod
     def _normalize_ai_content(content):
@@ -405,72 +454,45 @@ class Link:
             return None
         return answer
 
-    async def _local_gpt(
-        self,
-        prompt: str,
-        api_key: str,
-        model_id: str,
-        timeout: int = 40,
-    ) -> Tuple[Optional[str], Optional[str]]:
-        self.log.info("正在进行服务请求: 请求智能回答 (智谱 AI)")
+    async def _request_ai_backend(self, backend: dict, messages: List[dict], name: str, attempt=None):
+        """向单个 AI 后端发起请求, 失败返回 None 并记录可区分的原因."""
+        suffix = ""
+        if attempt and attempt[1] > 1:
+            suffix = f" [后端 {attempt[0]}/{attempt[1]}: {backend['model_id']}]"
+        self.log.info(f"正在进行服务请求: 请求{name}{suffix}")
 
         try:
-            client = self._get_zhipu_client(api_key)
+            client = self._get_zhipu_client(backend["api_key"], backend.get("base_url"))
         except ImportError:
-            self.log.warning("请求智能回答失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
-            return None, None
+            self.log.warning(f"请求{name}失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
+            return None
         except Exception as e:
-            self.log.warning(f"请求智能回答失败: 初始化智谱客户端失败: {e}.")
-            return None, None
+            self.log.warning(f"请求{name}失败: 初始化客户端失败: {e}.")
+            return None
 
         def run_request():
-            response = client.chat.completions.create(
-                model=model_id,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            response = client.chat.completions.create(model=backend["model_id"], messages=messages)
             return response.choices[0].message.content
 
         try:
-            content = await asyncio.wait_for(to_thread_compat(run_request), timeout=timeout)
+            return await asyncio.wait_for(to_thread_compat(run_request), timeout=backend["timeout"])
         except asyncio.TimeoutError:
-            self.log.warning("请求智能回答超时.")
-            return None, None
+            self.log.warning(f"请求{name}超时{suffix}.")
         except Exception as e:
-            self.log.warning(f"请求智能回答失败: {e}.")
-            return None, None
-
-        answer = self._normalize_ai_content(content)
-        if not answer:
-            self.log.warning("请求智能回答失败: 智谱 AI 返回空响应.")
-            return None, None
-        answer = self._strip_think_content(answer)
-        if not answer:
-            self.log.warning(
-                f"请求智能回答失败: 智谱 AI 仅返回思维链或空内容, 原始响应预览: {self._preview_ai_content(content)}."
-            )
-            return None, None
-        self.log.info("服务请求完成: 请求智能回答 (智谱 AI)")
-        return answer, f"zhipu:{model_id}"
+            if self._is_content_filter_error(e):
+                self.log.warning(
+                    f"请求{name}被服务商内容审核拦截{suffix}, "
+                    "可通过 `[checkiner.ai].fallbacks` 配置其他模型或服务商回退."
+                )
+            else:
+                self.log.warning(f"请求{name}失败{suffix}: {e}.")
+        return None
 
     async def visual(self, photo, options: List[str], question=None) -> Tuple[Optional[str], Optional[str]]:
-        """向机器人发送视觉问题解答请求."""
-        ai_config = self._get_local_ai_config()
-        api_key = ai_config.get("api_key")
-        if not api_key:
+        """向机器人发送视觉问题解答请求, 主后端失败时依次回退备用后端."""
+        backends = self._build_ai_backends(self._get_local_ai_config())
+        if not backends:
             self.log.warning("请求视觉问题解答失败: 未设置本地智谱 AI 配置 `[checkiner.ai].api_key`.")
-            return None, None
-
-        model_id = ai_config.get("model_id") or "glm-4.1v-thinking-flashx"
-        timeout = ai_config.get("llm_timeout", 40)
-
-        self.log.info("正在进行服务请求: 请求视觉问题解答 (智谱 AI)")
-        try:
-            client = self._get_zhipu_client(api_key)
-        except ImportError:
-            self.log.warning("请求视觉问题解答失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
-            return None, None
-        except Exception as e:
-            self.log.warning(f"请求视觉问题解答失败: 初始化智谱客户端失败: {e}.")
             return None, None
 
         try:
@@ -479,61 +501,60 @@ class Link:
             self.log.warning(f"请求视觉问题解答失败: 下载图片失败: {e}.")
             return None, None
 
+        image_data = self._encode_image_data(image)
         option_lines = "\n".join(f"- {option}" for option in options)
-        prompt = "你在帮助 Telegram 签到验证码识别。" "请根据图片内容，只从候选项中选择唯一正确的一项。"
-        if question:
-            prompt += f"\n题目或提示: {question}"
-        prompt += (
-            f"\n候选项如下:\n{option_lines}\n\n"
-            "只输出一行，格式必须为 [ANSWER]候选项原文[/ANSWER]。\n"
-            "如果无法判断，请输出 [ANSWER][UNKNOWN][/ANSWER]。"
-        )
 
-        def run_request():
-            response = client.chat.completions.create(
-                model=model_id,
-                messages=[
+        for index, backend in enumerate(backends):
+            model_id = backend["model_id"]
+            prompt = backend["prompt"] or "请根据图片内容，只从候选项中选择唯一正确的一项。"
+            if question:
+                prompt += f"\n题目或提示: {question}"
+            prompt += (
+                f"\n候选项如下:\n{option_lines}\n\n"
+                "只输出一行，格式必须为 [ANSWER]候选项原文[/ANSWER]。\n"
+                "如果无法判断，请输出 [ANSWER][UNKNOWN][/ANSWER]。"
+            )
+
+            content = await self._request_ai_backend(
+                backend,
+                [
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": self._encode_image_data(image)}},
+                            {"type": "image_url", "image_url": {"url": image_data}},
                         ],
                     }
                 ],
+                name="视觉问题解答",
+                attempt=(index + 1, len(backends)),
             )
-            return response.choices[0].message.content
+            if content is None:
+                continue
 
-        try:
-            content = await asyncio.wait_for(to_thread_compat(run_request), timeout=timeout)
-        except asyncio.TimeoutError:
-            self.log.warning("请求视觉问题解答超时.")
-            return None, None
-        except Exception as e:
-            self.log.warning(f"请求视觉问题解答失败: {e}.")
-            return None, None
+            answer = self._extract_answer_tag(self._strip_think_content(self._normalize_ai_content(content)))
+            if not answer:
+                self.log.warning(
+                    f"请求视觉问题解答失败: 未返回可用答案, 原始响应预览: {self._preview_ai_content(content)}."
+                )
+                continue
 
-        answer = self._extract_answer_tag(self._strip_think_content(self._normalize_ai_content(content)))
-        if not answer:
-            self.log.warning(
-                f"请求视觉问题解答失败: 智谱 AI 未返回可用答案, 原始响应预览: {self._preview_ai_content(content)}."
-            )
-            return None, None
+            if answer in options:
+                self.log.info("服务请求完成: 请求视觉问题解答")
+                return answer, f"zhipu:{model_id}"
 
-        if answer in options:
-            self.log.info("服务请求完成: 请求视觉问题解答 (智谱 AI)")
-            return answer, f"zhipu:{model_id}"
+            matched = process.extractOne(answer, options)
+            if not matched or matched[1] < 70:
+                self.log.warning(
+                    f'请求视觉问题解答失败: 返回答案 "{answer}" 无法匹配候选项 {options}, '
+                    f"最佳匹配结果: {matched}."
+                )
+                continue
 
-        matched = process.extractOne(answer, options)
-        if not matched or matched[1] < 70:
-            self.log.warning(
-                f'请求视觉问题解答失败: 返回答案 "{answer}" 无法匹配候选项 {options}, '
-                f"最佳匹配结果: {matched}."
-            )
-            return None, None
+            self.log.info("服务请求完成: 请求视觉问题解答")
+            return matched[0], f"zhipu:{model_id}"
 
-        self.log.info("服务请求完成: 请求视觉问题解答 (智谱 AI)")
-        return matched[0], f"zhipu:{model_id}"
+        return None, None
 
     async def ocr(self, photo) -> Optional[str]:
         """向机器人发送 OCR 解答请求."""
