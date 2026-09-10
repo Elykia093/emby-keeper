@@ -10,10 +10,10 @@ aiofiles
 python-dateutil
 ddddocrfix>=1.5.5
 kurigram==2.2.12
-tgcrypto
+tgcrypto; sys_platform != "win32"
+tgcrypto-pyrofork==1.2.8; sys_platform == "win32"
 pillow>10.0.0
 thefuzz[speedup]
-zai-sdk>=0.2.2
 aiocache
 flask==3.0.3
 flask-socketio==5.3.6

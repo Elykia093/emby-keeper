@@ -65,9 +65,20 @@ time = [300, 600]
 # ================================================================================
 
 [checkiner.ai]
-# 智谱 AI 配置，用于智能回答和图片验证码识别。
-api_key = "你的智谱 API KEY"
-model_id = "glm-4.1v-thinking-flashx"
+# AI 配置，用于智能回答和图片验证码识别，支持任意 OpenAI 兼容服务商。
+api_key = "你的 AI API KEY"
+model_id = "glm-4.6v-flash"
+
+# 请求超时时间 (秒):
+# timeout = 40
+# 自定义视觉识别提示词:
+# prompt = "请根据图片内容，只从候选项中选择唯一正确的一项。"
+# 自定义 OpenAI 兼容端点 (例如硅基流动), 不配置时默认为智谱官方:
+# base_url = "https://api.siliconflow.cn/v1"
+# 使用硅基流动看图选物时, 同时将 model_id 改为 "Qwen/Qwen3-VL-8B-Instruct"。
+# 备用后端列表, 主后端被拦截或失败时依次回退, 未指定字段继承上方主后端:
+# fallbacks = [{ api_key = "备用key", base_url = "https://api.siliconflow.cn/v1", model_id = "Qwen/Qwen3-VL-8B-Instruct" }]
+# PaddleOCR-VL 主要用于文档 OCR, 看图选物验证码需使用通用视觉问答模型。
 
 [checkiner]
 
@@ -200,16 +211,12 @@ concurrency = 1
 # scheme = "socks5" # 可选: http / socks5
 
 # ================================================================================
-# Cloudflare Turnstile 求解 (可选)
-# 月饼 embyguard 等站点需要
-# 优先级: 环境变量 (SOLVER_URL, YESCAPTCHA_KEY) > 本配置 > 默认 127.0.0.1:8889
+# Cloudflare Turnstile 求解 (YesCaptcha, 可选)
+# 月饼、結束バンド等站点触发验证时需要; 也可通过环境变量 YESCAPTCHA_KEY 配置
 # ================================================================================
 
 # [turnstile]
-# 自建 turnsolve 地址; 多个用逗号分隔, 失败自动换下一个:
-# solver_url = "http://127.0.0.1:8889,http://10.0.0.2:8889"
-# YesCaptcha API Key (设置后优先走 YesCaptcha, 不再请求 solver_url):
-# yescaptcha_key = ""
+# yescaptcha_key = "" # YesCaptcha API Key
 
 # ================================================================================
 # 日志推送相关设置

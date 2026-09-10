@@ -28,6 +28,14 @@
 - 新增 AI 识别多后端回退：`[checkiner.ai]` 支持 `fallbacks` 与 `base_url`，主后端被内容审核拦截或请求失败时自动切换到备用模型或 OpenAI 兼容服务商，仅配置 `api_key` 的原有配置行为不变。
 - 优化 AI 请求失败日志：内容审核拦截会单独提示并显示当前后端序号与模型名，可与请求超时、网络错误区分。
 - 调整视觉识别提示词：移除固定开场白，支持通过 `[checkiner.ai].llm_prompt` 自定义，未配置时使用内置默认值。
+- 调整結束バンド签到器：新增 Turnstile 自动求解与登录令牌缓存；移除废弃网页签到器。
+- 规范 AI 打码配置与结果来源：`[checkiner.ai]` 的超时与提示词键统一为 `timeout` 与 `prompt`，主后端与 `fallbacks` 使用同一套键名；识别结果与日志改为显示实际服务商，配置 `base_url` 指向第三方端点时不再统一标记为智谱。
+- 新增电子书库群组每日发言的人类验证处理：发言结束后在固定窗口内守候群内随机抽查，点名到本账号时自动点击验证按钮，抽查到其他用户时不响应，避免逾期未点击导致永久禁言。
+- 调整 Turnstile 求解服务：适配 YesCaptcha；月饼和結束バンド触发验证时需配置 `[turnstile].yescaptcha_key` 或环境变量 `YESCAPTCHA_KEY`。
+- 修复 結束バンド签到：解决缓存冲突和令牌过期问题。
+- 修复 电子书库群组验证：支持重试，发言失败后继续完成验证。
+- 修复 Turnstile 求解：超时或取消后停止后台请求。
+- 修复 Windows 安装更新：改用本仓库 Release，兼容 Python 3.12。
 
 [![build status](https://img.shields.io/github/actions/workflow/status/emby-keeper/emby-keeper/ci.yml?branch=main)](https://github.com/emby-keeper/emby-keeper/commits/main) [![pypi badge](https://img.shields.io/pypi/v/embykeeper)](https://pypi.org/project/embykeeper/) [![docker](https://img.shields.io/docker/v/elykia093/emby-keeper?label=docker)](https://hub.docker.com/r/elykia093/emby-keeper) [![docker pulls](https://img.shields.io/docker/pulls/elykia093/emby-keeper?label=pulls)](https://hub.docker.com/r/elykia093/emby-keeper) [![license badge](https://img.shields.io/github/license/emby-keeper/emby-keeper)](https://github.com/emby-keeper/emby-keeper/blob/main/LICENSE) [![telegram badge](https://img.shields.io/badge/telegram-bot-blue)](https://t.me/embykeeper_bot) [![telegram badge](https://img.shields.io/badge/telegram-channel-green)](https://t.me/embykeeper) [![telegram badge](https://img.shields.io/badge/telegram-group-violet)](https://t.me/embykeeperchat)
 

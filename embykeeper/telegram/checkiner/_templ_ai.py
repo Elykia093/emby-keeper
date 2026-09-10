@@ -14,8 +14,9 @@ from pyrogram.types import InlineKeyboardMarkup, Message, ReplyKeyboardMarkup
 from thefuzz import process
 
 from embykeeper.config import config
-from embykeeper.utils import to_iterable, to_thread_compat
+from embykeeper.utils import to_iterable
 
+from ..link import Link
 from . import BotCheckin
 from ._templ_a import TemplateACheckin
 
@@ -37,25 +38,22 @@ class TemplateAICheckinConfig(BaseModel):
     bot_use_captcha: Optional[bool] = None  # 是否将图片视为验证码
     bot_checkin_button: Union[str, List[str], None] = None  # 进入签到流程的按钮文本
     templ_panel_keywords: Union[str, List[str], None] = None  # 面板关键词
-    api_key: Optional[str] = None  # 智谱 API Key
-    model_id: Optional[str] = None  # 智谱图像模型 ID
-    llm_prompt: Optional[str] = None  # 发送给图像模型的额外提示词
-    llm_timeout: Optional[int] = None  # 图像模型超时时间
+    api_key: Optional[str] = None  # AI API Key
+    model_id: Optional[str] = None  # 图像模型 ID
+    base_url: Optional[str] = None  # OpenAI 兼容 API 地址
+    prompt: Optional[str] = None  # 发送给图像模型的额外提示词
+    timeout: Optional[int] = None  # 图像模型超时时间
     llm_button_match_threshold: Optional[int] = None  # LLM 结果与按钮的最低匹配分数
     # fmt: on
 
 
 class TemplateAICheckin(TemplateACheckin):
-    model_id = "glm-4.1v-thinking-flashx"
-    llm_timeout = 60
+    model_id = "glm-4.6v-flash"
+    ai_timeout = 60
     llm_button_match_threshold = 70
-    llm_prompt = (
+    ai_prompt = (
         "你在帮助 Telegram 签到。请根据图片中的验证码、图案、文字或题目，" "从候选按钮中选择唯一正确答案。"
     )
-
-    _zhipu_client = None
-    _zhipu_api_key = None
-    _zhipu_model_id = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -75,12 +73,34 @@ class TemplateAICheckin(TemplateACheckin):
         global_ai_config = self.get_global_ai_config()
         self.api_key = self.ai_config.api_key or global_ai_config.get("api_key")
         self.model_id = self.ai_config.model_id or global_ai_config.get("model_id") or self.model_id
-        self.llm_timeout = self.ai_config.llm_timeout or self.llm_timeout
+        self.base_url = (
+            self.ai_config.base_url
+            if self.ai_config.base_url is not None
+            else global_ai_config.get("base_url")
+        )
+        self.ai_timeout = (
+            self.ai_config.timeout
+            if self.ai_config.timeout is not None
+            else Link._read_ai_field(global_ai_config, "timeout", self.ai_timeout)
+        )
         self.llm_button_match_threshold = (
             self.ai_config.llm_button_match_threshold or self.llm_button_match_threshold
         )
-        if self.ai_config.llm_prompt:
-            self.llm_prompt = self.ai_config.llm_prompt
+        self.ai_prompt = (
+            self.ai_config.prompt
+            if self.ai_config.prompt is not None
+            else Link._read_ai_field(global_ai_config, "prompt", self.ai_prompt)
+        )
+        self._ai_backends = Link(self.client)._build_ai_backends(
+            {
+                **global_ai_config,
+                "api_key": self.api_key,
+                "model_id": self.model_id,
+                "base_url": self.base_url,
+                "timeout": self.ai_timeout,
+                "prompt": self.ai_prompt,
+            }
+        )
         self._last_llm_response_preview = None
 
         self.log = logger.bind(scheme="telechecker", name=self.name, username=self.client.me.full_name)
@@ -235,80 +255,50 @@ class TemplateAICheckin(TemplateACheckin):
         return self.pop_captcha_options_message()
 
     async def solve_with_llm(self, image, options: List[str]) -> Optional[str]:
-        client = self.get_zhipu_client()
-        if not client:
+        self._last_llm_response_preview = None
+        if not self._ai_backends:
+            self.log.warning(
+                "签到失败: 未设置 AI API Key, 请在 `config.toml` 中配置 `[checkiner.ai].api_key`."
+            )
             return None
 
-        self._last_llm_response_preview = None
-        prompt = self.build_prompt(options)
+        link = Link(self.client)
+        link.log = self.log
         image_url = self.encode_image(image)
-
-        def run_request():
-            response = client.chat.completions.create(
-                model=self.model_id,
-                messages=[
+        for index, backend in enumerate(self._ai_backends):
+            content = await link._request_ai_backend(
+                backend,
+                [
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": prompt},
+                            {"type": "text", "text": self.build_prompt(options, backend["prompt"])},
                             {"type": "image_url", "image_url": {"url": image_url}},
                         ],
                     }
                 ],
+                name="图像验证码解答",
+                attempt=(index + 1, len(self._ai_backends)),
             )
-            return response.choices[0].message.content
+            if content is None:
+                continue
 
-        try:
-            content = await asyncio.wait_for(to_thread_compat(run_request), timeout=self.llm_timeout)
-        except ImportError:
-            self.log.warning("签到失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
-            return None
-        except asyncio.TimeoutError:
-            self.log.warning("签到失败: 图像模型请求超时.")
-            return None
-        except Exception as e:
-            self.log.warning(f"签到失败: 图像模型请求失败: {e}.")
-            return None
-
-        if isinstance(content, list):
-            content = "".join(
-                item.get("text", "") if isinstance(item, dict) else str(item) for item in content
-            )
-        self._last_llm_response_preview = (content or "").replace("\n", " ").strip()[:200] or "<empty>"
-        answer = self.extract_answer(content)
-        if answer:
+            content = Link._normalize_ai_content(content)
+            self._last_llm_response_preview = content.replace("\n", " ").strip()[:200] or "<empty>"
+            answer = self.extract_answer(content)
+            if not answer:
+                self.log.warning("图像模型未返回可用答案.")
+                continue
+            if not self.match_button(answer, options):
+                self.log.warning("图像模型答案无法匹配候选按钮.")
+                continue
             self.log.debug(f"图像模型返回答案: {answer}")
-        return answer
+            return answer
+        return None
 
-    def get_zhipu_client(self):
-        api_key = self.api_key
-        if not api_key:
-            self.log.warning(
-                "签到失败: 未设置智谱 API Key, 请在 `config.toml` 中配置 `[checkiner.ai].api_key`."
-            )
-            return None
-
-        if (
-            self.__class__._zhipu_client
-            and self.__class__._zhipu_api_key == api_key
-            and self.__class__._zhipu_model_id == self.model_id
-        ):
-            return self.__class__._zhipu_client
-
-        try:
-            from zai import ZhipuAiClient
-        except ImportError:
-            self.log.warning("签到失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
-            return None
-
-        self.__class__._zhipu_client = ZhipuAiClient(api_key=api_key)
-        self.__class__._zhipu_api_key = api_key
-        self.__class__._zhipu_model_id = self.model_id
-        return self.__class__._zhipu_client
-
-    def build_prompt(self, options: List[str]) -> str:
+    def build_prompt(self, options: List[str], prompt: Optional[str] = None) -> str:
         option_lines = "\n".join(f"- {option}" for option in options)
-        prompt = self.llm_prompt.strip()
+        prompt = (self.ai_prompt if prompt is None else prompt).strip()
         if "{options}" in prompt:
             prompt = prompt.replace("{options}", option_lines)
         else:

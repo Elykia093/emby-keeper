@@ -6,9 +6,11 @@
 
 ## 安装教程
 
-您需要转到 [Release](https://github.com/emby-keeper/emby-keeper/releases) 界面, 选择最新版本 (`Latest`), 然后展开 `Assets`, 点击下载 `embykeeper-win-vx.x.x.zip` 文件 (请注意**不是** `exe`!).
+您需要转到 [本仓库的 Release](https://github.com/Elykia093/emby-keeper/releases) 界面, 选择最新版本 (`Latest`), 然后展开 `Assets`, 点击下载 `embykeeper-win-vx.x.x.zip` 文件 (请注意**不是** `exe`!).
 
 解压后运行 `Embykeeper.bat`, Embykeeper 将会自动安装到当前文件夹中.
+
+首次安装使用压缩包对应的版本, 程序包从同一版本的 GitHub Release 下载, PyAES 依赖随压缩包提供, 其余依赖通过 Python 包源安装. 如果提示程序包尚未就绪, 请等待该版本的发布构建完成后重新运行脚本.
 
 :::info 如果运行失败
 
@@ -25,7 +27,7 @@
 
 :::
 
-安装后 Embykeeper 将首次运行并在当前目录下生成模板 `config.toml` 文件 (您也可以从[这里](https://github.com/emby-keeper/emby-keeper/blob/main/config.example.toml)下载).
+安装后 Embykeeper 将首次运行并在当前目录下生成模板 `config.toml` 文件 (您也可以从[这里](https://github.com/Elykia093/emby-keeper/blob/main/config.example.toml)下载).
 
 <!--@include: ./_简要配置.md-->
 
@@ -53,6 +55,6 @@
 
 当您需要更新版本时, 您需要关闭 Embykeeper, 然后运行 `Embykeeper.bat` 同一目录下的 `Update.bat`.
 
-脚本将提示您更新信息.
+脚本会从本仓库最新的正式 Release 获取更新, 并检查版本与程序包完整性. 如果下载或安装失败, 修复网络问题或等待发布构建完成后, 可以重新运行更新脚本.
 
 更新后, 重新运行 `Embykeeper.bat`.

@@ -1,5 +1,5 @@
 from typing import List, Optional, Union, Dict, Any, ClassVar
-from pydantic import BaseModel, Field, model_validator, ValidationError
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationError
 from pydantic.networks import HttpUrl
 
 DEFAULT_TIME_RANGE = "<11:00AM,11:00PM>"
@@ -111,6 +111,13 @@ class NotifierConfig(ConfigModel):
     method: Optional[str] = "telegram"
     apprise_uri: Optional[str] = None
     telegram_api_url: Optional[UseHttpUrl] = None
+
+    @field_validator("telegram_api_url", mode="before")
+    @classmethod
+    def normalize_empty_telegram_api_url(cls, value: Any) -> Any:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 class SiteConfig(ConfigModel):
@@ -238,12 +245,8 @@ class BotConfig(ConfigModel):
 
 
 class TurnstileConfig(ConfigModel):
-    """Cloudflare Turnstile 本地求解配置 (月饼 embyguard 等)."""
+    """Cloudflare Turnstile 的 YesCaptcha 求解配置."""
 
-    # 自建 turnsolve 地址; 支持逗号分隔多个, 失败自动换下一个
-    # 例: "http://127.0.0.1:8889,http://10.0.0.2:8889"
-    solver_url: Optional[str] = None
-    # YesCaptcha API Key; 设置后优先走 YesCaptcha, 不再请求 solver_url
     yescaptcha_key: Optional[str] = None
 
 
@@ -300,6 +303,12 @@ class Config(ConfigModel):
     @model_validator(mode="before")
     @classmethod
     def handle_aliases(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        turnstile = values.get("turnstile") if isinstance(values, dict) else None
+        if isinstance(turnstile, dict) and "solver_url" in turnstile:
+            # 旧求解器设置不再生效, 但不应阻止整份配置加载.
+            values = dict(values)
+            values["turnstile"] = {key: value for key, value in turnstile.items() if key != "solver_url"}
+
         for service in ["emby", "subsonic", "telegram"]:
             if service in values and isinstance(values[service], list):
                 if service == "telegram":

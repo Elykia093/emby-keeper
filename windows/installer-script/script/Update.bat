@@ -1,4 +1,6 @@
 @echo off
+setlocal
+cd /d "%~dp0" || exit /b 1
 
 where powershell >nul 2>nul
 if not %errorlevel% == 0 (
@@ -9,17 +11,18 @@ if not %errorlevel% == 0 (
 echo **************************************************
 echo *            请等待, 正在更新 Embykeeper         *
 echo **************************************************
-powershell Unblock-File -Path '%~dp0downloaders\download_python.ps1'
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_python.ps1" -Version 3.12.10 -TargetDirectory "." || goto :error
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_pip.ps1" -TargetDirectory "python-3.12.10-embed-amd64" || goto :error
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_deps.ps1" -Update -PythonPath "python-3.12.10-embed-amd64\python.exe" || goto :error
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_deps.ps1" -Update -RequirementsFile "%~dp0script\requirements.txt" -PythonPath "%~dp0python-3.12.10-embed-amd64\python.exe" || goto :error
 
 echo **************************************************
 "%~dp0/python-3.12.10-embed-amd64/python.exe" -c "import embykeeper; print(f'更新已结束, 当前版本为: {embykeeper.__version__}')"
+set "RunExitCode=%errorlevel%"
 (((echo.%cmdcmdline%)|find /I "%~0")>nul) && echo | set /p="请按任意键退出..." & pause>nul
-goto :EOF
+exit /b %RunExitCode%
 
 :error
 echo **************************************************
 echo 发生错误, 即将退出, 请反馈以上信息.
 (((echo.%cmdcmdline%)|find /I "%~0")>nul) && pause
+exit /b 1

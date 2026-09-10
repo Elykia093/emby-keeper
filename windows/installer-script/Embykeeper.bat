@@ -1,4 +1,6 @@
 @echo off
+setlocal
+cd /d "%~dp0" || exit /b 1
 
 where powershell >nul 2>nul
 if not %errorlevel% == 0 (
@@ -6,11 +8,15 @@ if not %errorlevel% == 0 (
     (((echo.%cmdcmdline%)|find /I "%~0")>nul) && pause
     exit /b 1
 )
-if not exist "%~dp0/python-3.12.10-embed-amd64" (
+set "NeedsInstall=1"
+if exist "%~dp0python-3.12.10-embed-amd64\python.exe" (
+    "%~dp0python-3.12.10-embed-amd64\python.exe" -c "from embykeeper.cli import app" >nul 2>nul
+    if not errorlevel 1 set "NeedsInstall="
+)
+if defined NeedsInstall (
     echo **************************************************
     echo *            请等待, 正在下载 Embykeeper         *
     echo **************************************************
-    powershell Unblock-File -Path '%~dp0downloaders\download_python.ps1'
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_python.ps1" -Version 3.12.10 -TargetDirectory "." || goto :error
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_pip.ps1" -TargetDirectory "python-3.12.10-embed-amd64" || goto :error
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0downloaders\download_deps.ps1" -RequirementsFile "%~dp0script\requirements.txt" -PythonPath "%~dp0python-3.12.10-embed-amd64\python.exe" || goto :error
@@ -21,12 +27,14 @@ if not exist "%~dp0/python-3.12.10-embed-amd64" (
     cls
 )
 "%~dp0/python-3.12.10-embed-amd64/python.exe" "script\cli.py" %*
+set "RunExitCode=%errorlevel%"
 echo.
 (((echo.%cmdcmdline%)|find /I "%~0")>nul) && echo | set /p="Embykeeper 已结束, 请按任意键退出..." & pause>nul
 
-goto :EOF
+exit /b %RunExitCode%
 
 :error
 echo **************************************************
 echo 发生错误, 即将退出, 请反馈以上信息.
 (((echo.%cmdcmdline%)|find /I "%~0")>nul) && pause
+exit /b 1

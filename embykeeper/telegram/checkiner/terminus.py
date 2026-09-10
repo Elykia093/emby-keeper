@@ -4,6 +4,7 @@ import emoji
 from pyrogram.types import Message
 from pyrogram.errors import RPCError
 
+from ...runinfo import RunStatus
 from ..link import Link
 from . import AnswerBotCheckin
 
@@ -16,7 +17,17 @@ class TerminusCheckin(AnswerBotCheckin):
     bot_checked_keywords = ["今天已签到"]
     additional_auth = ["visual"]
     max_retries = 1
-    bot_use_history = 3
+    # 验证码仅在当前会话的 30 秒内有效, 不能重放历史图片.
+    bot_use_history = None
+
+    async def on_text(self, message: Message, text: str):
+        if text and "签到机会已用完" in text:
+            self.log.warning("今日签到机会不可用, 签到状态未确认.")
+            return await self.finish(RunStatus.FAIL, "今日签到机会不可用, 签到状态未确认")
+        if text and "回答超时" in text and "今日不能再签到" in text:
+            self.log.warning("签到失败: 回答超时, 今日不能再签到.")
+            return await self.finish(RunStatus.FAIL, "回答超时, 今日不能再签到")
+        return await super().on_text(message, text)
 
     async def on_photo(self, message: Message):
         """分析分析传入的验证码图片并返回验证码."""

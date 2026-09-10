@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag to upload assets to
         required: true
-        default: v7.6.5
+        default: v7.6.6
   release:
     types: [released]
 
@@ -24,6 +24,57 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+      - name: Verify Windows release version
+        shell: bash
+        run: |
+          python - <<'PY'
+          import ast
+          import configparser
+          import os
+          from pathlib import Path
+          import re
+          import tomllib
+
+          tag = os.environ["RELEASE_TAG"]
+          if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+              raise SystemExit("The Windows release tag must be a stable vX.Y.Z version.")
+          expected = tag[1:]
+          package = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          installer = configparser.ConfigParser()
+          installer.read("installer.cfg")
+          core = next(
+              ast.literal_eval(node.value)
+              for node in ast.parse(Path("embykeeper/__init__.py").read_text()).body
+              if isinstance(node, ast.Assign)
+              and any(isinstance(target, ast.Name) and target.id == "__version__" for target in node.targets)
+          )
+          requirements = Path("windows/installer-script/script/requirements.txt").read_text().strip()
+          if (package, core, installer["Application"]["version"], requirements) != (
+              expected, expected, expected, f"embykeeper=={expected}"
+          ):
+              raise SystemExit("The tag, Python package and Windows installer versions do not match.")
+          PY
+      - name: Build bundled PyAES wheel
+        run: python -m pip wheel --no-deps pyaes==1.6.1 --wheel-dir windows/installer-script/wheels
+      - name: Wait for the release wheel
+        timeout-minutes: 12
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          wheel="embykeeper-${RELEASE_TAG#v}-py3-none-any.whl"
+          for attempt in {1..30}; do
+            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+              --jq '.assets[] | select(.state == "uploaded") | .name' | grep -Fxq "$wheel"; then
+              exit 0
+            fi
+            echo "Waiting for $wheel ($attempt/30)."
+            sleep 20
+          done
+          echo "::error::The release wheel is unavailable. Finish the Python package release build, then rerun this job."
+          exit 1
       - name: Archive Windows Installer Script Version
         uses: thedoctor0/zip-release@0.7.1
         with:
@@ -49,6 +100,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - name: Build PyAES
         run: |
           pip wheel pyaes==1.6.1 -w windows/installer-gui/Resources

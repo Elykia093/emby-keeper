@@ -234,6 +234,27 @@ class ConfigManager(ProxyBase):
         doc.add(comment("Telegram 机器人签到相关设置"))
         doc.add(comment(f"详见: https://emby-keeper.github.io/guide/配置文件#checkiner-子项"))
         doc.add(comment("=" * 80))
+        doc.add(nl())
+        ai = item({})
+        ai.add(comment("AI 配置，用于智能回答和图片验证码识别，支持任意 OpenAI 兼容服务商。"))
+        ai["api_key"] = "你的 AI API KEY"
+        ai["model_id"] = "glm-4.6v-flash"
+        ai.add(nl())
+        ai.add(comment("请求超时时间 (秒):"))
+        ai.add(comment("timeout = 40"))
+        ai.add(comment("自定义视觉识别提示词:"))
+        ai.add(comment('prompt = "请根据图片内容，只从候选项中选择唯一正确的一项。"'))
+        ai.add(comment("自定义 OpenAI 兼容端点 (例如硅基流动), 不配置时默认为智谱官方:"))
+        ai.add(comment('base_url = "https://api.siliconflow.cn/v1"'))
+        ai.add(comment('使用硅基流动看图选物时, 同时将 model_id 改为 "Qwen/Qwen3-VL-8B-Instruct"。'))
+        ai.add(comment("备用后端列表, 主后端被拦截或失败时依次回退, 未指定字段继承上方主后端:"))
+        ai.add(
+            comment(
+                'fallbacks = [{ api_key = "备用key", base_url = "https://api.siliconflow.cn/v1", '
+                'model_id = "Qwen/Qwen3-VL-8B-Instruct" }]'
+            )
+        )
+        ai.add(comment("PaddleOCR-VL 主要用于文档 OCR, 看图选物验证码需使用通用视觉问答模型。"))
         c = item({})
         c.add(nl())
         c.add(
@@ -257,6 +278,7 @@ class ConfigManager(ProxyBase):
         c.add(nl())
         c.add(comment("每隔几天进行签到:"))
         c["interval_days"] = 1
+        c["ai"] = ai
         doc["checkiner"] = c
         c.add(nl())
 
@@ -456,15 +478,12 @@ class ConfigManager(ProxyBase):
         doc.add(nl())
 
         doc.add(comment("=" * 80))
-        doc.add(comment("Cloudflare Turnstile 求解 (可选)"))
-        doc.add(comment("月饼 embyguard 等站点需要; 也可通过环境变量 SOLVER_URL / YESCAPTCHA_KEY 配置"))
+        doc.add(comment("Cloudflare Turnstile 求解 (YesCaptcha, 可选)"))
+        doc.add(comment("月饼、結束バンド等站点触发验证时需要; 也可通过环境变量 YESCAPTCHA_KEY 配置"))
         doc.add(comment("=" * 80))
         doc.add(nl())
-        c = item({})
-        c.add(comment("自建 turnsolve 地址; 多个用逗号分隔, 失败自动换下一个:"))
-        c["solver_url"] = "http://127.0.0.1:8889,http://10.0.0.2:8889"
-        c.add(comment("YesCaptcha API Key (设置后优先走 YesCaptcha, 不再请求 solver_url):"))
-        c["yescaptcha_key"] = ""
+        c = item({"turnstile": {"yescaptcha_key": ""}})
+        c["turnstile"]["yescaptcha_key"].comment("YesCaptcha API Key")
         for line in c.as_string().strip().split("\n"):
             doc.add(comment(line))
         doc.add(nl())

@@ -150,12 +150,9 @@ class MooncakeCheckin(TemplateACheckin):
         return result
 
     def _turnstile_service(self) -> TurnstileService:
-        """从 config.toml [turnstile] / 环境变量构造求解器.
-        solver_url 支持逗号分隔多个地址, 失败自动换下一个.
-        """
+        """从 config.toml [turnstile] / 环境变量构造 YesCaptcha 求解器."""
         t = getattr(config, "turnstile", None)
         return TurnstileService(
-            solver_url=(getattr(t, "solver_url", None) or "") if t else "",
             yescaptcha_key=(getattr(t, "yescaptcha_key", None) or "") if t else "",
         )
 
@@ -166,23 +163,20 @@ class MooncakeCheckin(TemplateACheckin):
         action: str = "",
         cdata: str = "",
     ) -> str | None:
-        """同步 TurnstileService 放到线程池, 避免阻塞事件循环.
+        """使用可取消的异步 Turnstile 求解.
 
         embyguard 前端用 siteKey + action + cdata 渲染 widget,
         求解时必须带上相同参数, 否则服务端 invalid_turnstile.
         """
         try:
             svc = self._turnstile_service()
-            self.log.debug(
-                f"Turnstile solvers: {svc.solver_urls}"
-                + (f", yescaptcha={'on' if svc.yescaptcha_key else 'off'}")
-            )
-            return await asyncio.to_thread(
-                svc.solve_turnstile,
+            self.log.debug("Turnstile 求解服务: YesCaptcha")
+            return await svc.solve_turnstile_async(
                 website_url,
                 website_key,
                 action=action or "",
                 cdata=cdata or "",
+                timeout=float(self.timeout),
             )
         except Exception as e:
             self.log.warning(f"Turnstile 求解失败: {e.__class__.__name__}: {e}")
@@ -257,7 +251,8 @@ class MooncakeCheckin(TemplateACheckin):
                     token = await self._solve_turnstile(webview_url, site_key, action=action, cdata=cdata)
                     if not token:
                         self.log.warning(
-                            "签到失败: Turnstile 求解失败. " "请确认 SOLVER_URL / YESCAPTCHA_KEY 可用."
+                            "签到失败: Turnstile 求解失败. "
+                            "请确认 [turnstile].yescaptcha_key 或环境变量 YESCAPTCHA_KEY 可用."
                         )
                         return await self.fail()
 

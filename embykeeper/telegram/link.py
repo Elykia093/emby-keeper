@@ -1,13 +1,16 @@
 import asyncio
 import base64
 import mimetypes
+import os
 import random
 import re
 from pathlib import Path
 from typing import Callable, Coroutine, List, Optional, Tuple, Union
+from urllib.parse import urlparse
 import uuid
 from io import BytesIO
 
+import httpx
 import tomli
 from loguru import logger
 from pyrogram import filters
@@ -19,7 +22,7 @@ from pyrogram.errors import FloodWait
 from thefuzz import process
 
 from embykeeper.config import config
-from embykeeper.utils import async_partial, to_thread_compat, truncate_str
+from embykeeper.utils import async_partial, truncate_str
 
 from .lock import super_ad_shown, super_ad_shown_lock, authed_services, authed_services_lock
 from .pyrogram import Client
@@ -29,12 +32,18 @@ class LinkError(Exception):
     pass
 
 
+# AI 打码后端默认值; 服务商可通过 [checkiner.ai].base_url 换成任意 OpenAI 兼容端点
+DEFAULT_AI_MODEL = "glm-4.6v-flash"
+DEFAULT_AI_TIMEOUT = 40
+DEFAULT_AI_PROVIDER = "zhipu"
+DEFAULT_AI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+
+
 class Link:
     """云服务类, 用于认证和高级权限任务通讯."""
 
     bot = "embykeeper_auth_bot"
     post_count = 0
-    _zhipu_clients = {}
 
     def __init__(self, client: Client):
         self.client = client
@@ -340,7 +349,7 @@ class Link:
         """向机器人发送智能回答请求, 主后端失败时依次回退备用后端."""
         backends = self._build_ai_backends(self._get_local_ai_config())
         if not backends:
-            self.log.warning("请求智能回答失败: 未设置本地智谱 AI 配置 `[checkiner.ai].api_key`.")
+            self.log.warning("请求智能回答失败: 未设置 AI 打码配置 `[checkiner.ai].api_key`.")
             return None, None
 
         for index, backend in enumerate(backends):
@@ -361,7 +370,7 @@ class Link:
                 continue
 
             self.log.info("服务请求完成: 请求智能回答")
-            return answer, f"zhipu:{backend['model_id']}"
+            return answer, backend["label"]
 
         return None, None
 
@@ -371,51 +380,48 @@ class Link:
             return ai_config
         return {}
 
-    @classmethod
-    def _get_zhipu_client(cls, api_key: str, base_url: str = None):
-        cache_key = (api_key, base_url or "")
-        if cache_key in cls._zhipu_clients:
-            return cls._zhipu_clients[cache_key]
-
-        from zai import ZhipuAiClient
-
-        kwargs = {"api_key": api_key}
-        if base_url:
-            kwargs["base_url"] = base_url
-        client = ZhipuAiClient(**kwargs)
-        cls._zhipu_clients[cache_key] = client
-        return client
-
     @staticmethod
     def _is_content_filter_error(error) -> bool:
         """判断异常是否为服务商内容审核拦截, 这类失败重试同一后端没有意义."""
-        text = str(error)
+        text = error.response.text if isinstance(error, httpx.HTTPStatusError) else str(error)
         return "contentFilter" in text or '"1301"' in text or ("敏感" in text and "内容" in text)
+
+    @staticmethod
+    def _ai_provider(base_url: Optional[str]) -> str:
+        """由 base_url 推导服务商标识, 用于日志与结果来源标记."""
+        if not base_url:
+            return DEFAULT_AI_PROVIDER
+        host = urlparse(base_url).hostname or ""
+        parts = [p for p in host.split(".") if p not in ("www", "api", "open")]
+        return parts[0] if parts else (host or DEFAULT_AI_PROVIDER)
+
+    @staticmethod
+    def _read_ai_field(source: dict, key: str, default=None):
+        return source[key] if source.get(key) is not None else default
 
     def _build_ai_backends(self, ai_config: dict) -> List[dict]:
         """展开主后端与 fallbacks, 未指定的字段继承主后端."""
         primary = {
             "api_key": ai_config.get("api_key"),
             "base_url": ai_config.get("base_url"),
-            "model_id": ai_config.get("model_id") or "glm-4.1v-thinking-flashx",
-            "timeout": ai_config.get("llm_timeout", 40),
-            "prompt": ai_config.get("llm_prompt"),
+            "model_id": ai_config.get("model_id") or DEFAULT_AI_MODEL,
+            "timeout": self._read_ai_field(ai_config, "timeout", DEFAULT_AI_TIMEOUT),
+            "prompt": self._read_ai_field(ai_config, "prompt"),
         }
         backends = [primary]
         for entry in ai_config.get("fallbacks") or []:
             if not isinstance(entry, dict):
                 continue
             backend = dict(primary)
-            for key, alias in (
-                ("api_key", "api_key"),
-                ("base_url", "base_url"),
-                ("model_id", "model_id"),
-                ("timeout", "llm_timeout"),
-                ("prompt", "llm_prompt"),
-            ):
-                if entry.get(alias) is not None:
-                    backend[key] = entry[alias]
+            for key in ("api_key", "base_url", "model_id", "timeout", "prompt"):
+                value = self._read_ai_field(entry, key)
+                if value is not None:
+                    backend[key] = value
             backends.append(backend)
+        for backend in backends:
+            backend["base_url"] = backend["base_url"] or os.environ.get("ZAI_BASE_URL")
+            backend["provider"] = self._ai_provider(backend["base_url"])
+            backend["label"] = f"{backend['provider']}:{backend['model_id']}"
         return [b for b in backends if b["api_key"]]
 
     @staticmethod
@@ -458,25 +464,27 @@ class Link:
         """向单个 AI 后端发起请求, 失败返回 None 并记录可区分的原因."""
         suffix = ""
         if attempt and attempt[1] > 1:
-            suffix = f" [后端 {attempt[0]}/{attempt[1]}: {backend['model_id']}]"
+            suffix = f" [后端 {attempt[0]}/{attempt[1]}: {backend['label']}]"
         self.log.info(f"正在进行服务请求: 请求{name}{suffix}")
 
+        base_url = backend.get("base_url") or os.environ.get("ZAI_BASE_URL") or DEFAULT_AI_BASE_URL
         try:
-            client = self._get_zhipu_client(backend["api_key"], backend.get("base_url"))
-        except ImportError:
-            self.log.warning(f"请求{name}失败: 未安装 zai-sdk, 请先安装 `zai-sdk>=0.2.2`.")
-            return None
-        except Exception as e:
-            self.log.warning(f"请求{name}失败: 初始化客户端失败: {e}.")
-            return None
-
-        def run_request():
-            response = client.chat.completions.create(model=backend["model_id"], messages=messages)
-            return response.choices[0].message.content
-
-        try:
-            return await asyncio.wait_for(to_thread_compat(run_request), timeout=backend["timeout"])
-        except asyncio.TimeoutError:
+            async with asyncio.timeout(backend["timeout"]):
+                async with httpx.AsyncClient(timeout=backend["timeout"]) as http_client:
+                    response = await http_client.post(
+                        f"{base_url.rstrip('/')}/chat/completions",
+                        headers={"Authorization": f"Bearer {backend['api_key']}"},
+                        json={"model": backend["model_id"], "messages": messages},
+                    )
+                    response.raise_for_status()
+                    content = response.json()["choices"][0]["message"].get("content")
+                    if content is not None and not isinstance(content, str):
+                        if not isinstance(content, list) or not all(
+                            isinstance(part, dict) and isinstance(part.get("text"), str) for part in content
+                        ):
+                            raise ValueError("AI 响应 content 不是文本")
+                    return content
+        except (asyncio.TimeoutError, httpx.TimeoutException):
             self.log.warning(f"请求{name}超时{suffix}.")
         except Exception as e:
             if self._is_content_filter_error(e):
@@ -484,15 +492,17 @@ class Link:
                     f"请求{name}被服务商内容审核拦截{suffix}, "
                     "可通过 `[checkiner.ai].fallbacks` 配置其他模型或服务商回退."
                 )
+            elif isinstance(e, httpx.HTTPStatusError):
+                self.log.warning(f"请求{name}失败{suffix}: HTTP {e.response.status_code}.")
             else:
-                self.log.warning(f"请求{name}失败{suffix}: {e}.")
+                self.log.warning(f"请求{name}失败{suffix}: {type(e).__name__}.")
         return None
 
     async def visual(self, photo, options: List[str], question=None) -> Tuple[Optional[str], Optional[str]]:
         """向机器人发送视觉问题解答请求, 主后端失败时依次回退备用后端."""
         backends = self._build_ai_backends(self._get_local_ai_config())
         if not backends:
-            self.log.warning("请求视觉问题解答失败: 未设置本地智谱 AI 配置 `[checkiner.ai].api_key`.")
+            self.log.warning("请求视觉问题解答失败: 未设置 AI 打码配置 `[checkiner.ai].api_key`.")
             return None, None
 
         try:
@@ -505,7 +515,6 @@ class Link:
         option_lines = "\n".join(f"- {option}" for option in options)
 
         for index, backend in enumerate(backends):
-            model_id = backend["model_id"]
             prompt = backend["prompt"] or "请根据图片内容，只从候选项中选择唯一正确的一项。"
             if question:
                 prompt += f"\n题目或提示: {question}"
@@ -541,7 +550,7 @@ class Link:
 
             if answer in options:
                 self.log.info("服务请求完成: 请求视觉问题解答")
-                return answer, f"zhipu:{model_id}"
+                return answer, backend["label"]
 
             matched = process.extractOne(answer, options)
             if not matched or matched[1] < 70:
@@ -552,7 +561,7 @@ class Link:
                 continue
 
             self.log.info("服务请求完成: 请求视觉问题解答")
-            return matched[0], f"zhipu:{model_id}"
+            return matched[0], backend["label"]
 
         return None, None
 
