@@ -1,1 +1,1 @@
-FROM elykia093/emby-keeper:v7.6.6
+FROM elykia093/emby-keeper:v7.6.7
