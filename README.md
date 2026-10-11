@@ -36,8 +36,6 @@
 - 修复 电子书库群组验证：支持重试，发言失败后继续完成验证。
 - 修复 Turnstile 求解：超时或取消后停止后台请求。
 - 修复 Windows 安装更新：改用本仓库 Release，兼容 Python 3.12。
-- 优化签到器进度消息识别：识别“签到中”“正在处理”等纯进度提示后静默等待，避免触发不必要的 AI 调用；带结果关键词的复合消息仍按原逻辑解析。
-- 修复結束バンド签到结果归类：提交响应为 HTTP 2xx 且 `success=true` 时计为本次成功；单项日志区分签到前已完成与提交时重复签到。
 
 [![build status](https://img.shields.io/github/actions/workflow/status/emby-keeper/emby-keeper/ci.yml?branch=main)](https://github.com/emby-keeper/emby-keeper/commits/main) [![pypi badge](https://img.shields.io/pypi/v/embykeeper)](https://pypi.org/project/embykeeper/) [![docker](https://img.shields.io/docker/v/elykia093/emby-keeper?label=docker)](https://hub.docker.com/r/elykia093/emby-keeper) [![docker pulls](https://img.shields.io/docker/pulls/elykia093/emby-keeper?label=pulls)](https://hub.docker.com/r/elykia093/emby-keeper) [![license badge](https://img.shields.io/github/license/emby-keeper/emby-keeper)](https://github.com/emby-keeper/emby-keeper/blob/main/LICENSE) [![telegram badge](https://img.shields.io/badge/telegram-bot-blue)](https://t.me/embykeeper_bot) [![telegram badge](https://img.shields.io/badge/telegram-channel-green)](https://t.me/embykeeper) [![telegram badge](https://img.shields.io/badge/telegram-group-violet)](https://t.me/embykeeperchat)
 

@@ -611,13 +611,6 @@ class BotCheckin(BaseBotCheckin):
                     self.log.info(f"[yellow]签到成功[/].")
                 await self.after_success()
                 await self.finish(RunStatus.SUCCESS, "签到成功")
-        elif re.fullmatch(
-            r"[\s⏳⌛🔄\ufe0f]*(?:(?:正在)?(?:签到|簽到|打卡|处理|處理)中"
-            r"|正在(?:签到|簽到|打卡|处理|處理))"
-            r"[\s.,，。…!！]*(?:(?:请|請)(?:稍[等候后後]|耐心等待)[\s.,，。…!！]*)?",
-            text,
-        ):
-            return
         else:
             await self.on_unexpected_text(message)
 

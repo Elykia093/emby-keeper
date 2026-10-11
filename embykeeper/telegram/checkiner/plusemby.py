@@ -74,41 +74,36 @@ def classify_status_response(status_code: int, payload: Any) -> tuple[RunStatus,
         return RunStatus.FAIL, "登录已失效"
     if status_code == 403:
         return RunStatus.FAIL, ACCESS_BLOCKED_MESSAGE
-    if not 200 <= status_code < 300 or not isinstance(payload, dict):
+    if status_code >= 400 or not isinstance(payload, dict):
         return RunStatus.FAIL, extract_message(payload, "获取签到状态失败")
     if payload.get("success") is False:
         return RunStatus.FAIL, extract_message(payload, "获取签到状态失败")
     checked_in = payload.get("hasCheckedInToday")
     if checked_in is True:
-        return RunStatus.NONEED, "签到前查询确认今日已签到, 跳过提交"
+        return RunStatus.NONEED, "今日已签到"
     if checked_in is False:
         return RunStatus.RUNNING, "尚未签到"
     return RunStatus.FAIL, extract_message(payload, "签到状态响应异常")
 
 
 def classify_checkin_response(status_code: int, payload: Any) -> tuple[RunStatus, str]:
-    if status_code == 401:
-        return RunStatus.FAIL, "登录已失效"
     if status_code == 403:
         return RunStatus.FAIL, ACCESS_BLOCKED_MESSAGE
-    if not isinstance(payload, dict):
-        return RunStatus.FAIL, extract_message(payload, "签到失败")
-
-    success = payload.get("success") is True
-    if 200 <= status_code < 300 and success:
-        amount = payload.get("amount")
-        currency = payload.get("currencyUnit")
-        if amount is not None and currency:
-            return RunStatus.SUCCESS, f"+{amount} {currency}"
-        return RunStatus.SUCCESS, extract_message(payload, "签到成功")
-
     if (
-        (200 <= status_code < 300 or status_code in {400, 409})
-        and not success
+        status_code < 500
+        and status_code not in {401, 403}
+        and isinstance(payload, dict)
         and payload.get("hasCheckedIn") is True
     ):
-        return RunStatus.NONEED, "提交时站点确认今日已签到"
-    return RunStatus.FAIL, extract_message(payload, "签到失败")
+        return RunStatus.NONEED, "今日已签到"
+    if status_code >= 400 or not isinstance(payload, dict) or payload.get("success") is not True:
+        return RunStatus.FAIL, extract_message(payload, "签到失败")
+
+    amount = payload.get("amount")
+    currency = payload.get("currencyUnit")
+    if amount is not None and currency:
+        return RunStatus.SUCCESS, f"+{amount} {currency}"
+    return RunStatus.SUCCESS, extract_message(payload, "签到成功")
 
 
 class PlusembyCheckin(BaseBotCheckin):
@@ -353,7 +348,7 @@ class PlusembyCheckin(BaseBotCheckin):
         if status == RunStatus.SUCCESS:
             self.log.info(f"[yellow]签到成功[/]: {truncate_str(message, 80)}")
         elif status == RunStatus.NONEED:
-            self.log.info(f"{message}.")
+            self.log.info("今日已经签到过了.")
         else:
             self.log.warning(f"签到失败: {truncate_str(message, 80)}")
         return self.ctx.finish(status, message)
